@@ -1,0 +1,2 @@
+# surge
+same as `ping`
