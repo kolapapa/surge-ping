@@ -62,7 +62,7 @@ async fn recv_loop(socket: AsyncSocket) {
 
 #[tokio::main]
 async fn main() {
-    let socket = AsyncSocket::new(None).expect("socket create error");
+    let socket = AsyncSocket::new().expect("socket create error");
 
     let to: IpAddr = "114.114.114.114".parse().unwrap();
     send(to, 56, socket.clone()).await;

@@ -1,5 +1,7 @@
+#[cfg(target_os = "linux")]
+use std::ffi::CStr;
 use std::io;
-use std::{ffi::CStr, sync::Arc};
+use std::sync::Arc;
 
 use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 use tokio::io::unix::AsyncFd;
@@ -10,10 +12,20 @@ pub struct AsyncSocket {
 }
 
 impl AsyncSocket {
+    #[cfg(target_os = "linux")]
     pub fn new(interface: Option<&CStr>) -> io::Result<AsyncSocket> {
         let socket = Socket::new(Domain::ipv4(), Type::raw(), Some(Protocol::icmpv4()))?;
-        #[cfg(target_os = "linux")]
+        // #[cfg(target_os = "linux")]
         socket.bind_device(interface)?;
+        socket.set_nonblocking(true)?;
+        Ok(AsyncSocket {
+            inner: Arc::new(AsyncFd::new(socket)?),
+        })
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    pub fn new() -> io::Result<AsyncSocket> {
+        let socket = Socket::new(Domain::ipv4(), Type::raw(), Some(Protocol::icmpv4()))?;
         socket.set_nonblocking(true)?;
         Ok(AsyncSocket {
             inner: Arc::new(AsyncFd::new(socket)?),
