@@ -13,7 +13,7 @@ same as `ping`, based on `tokio 1.0` + `socket2` + `packet`
 $ git clone https://github.com/kolapapa/surge.git
 $ cd surge
 $ cargo build
-sudo ./target/debug/surge -h www.baidu.com -s 56
+sudo RUST_LOG=info ./target/debug/surge -h www.baidu.com -s 56
 56 bytes from 110.242.68.3: icmp_seq=0 ttl=44 time=13.434519ms
 56 bytes from 110.242.68.3: icmp_seq=1 ttl=44 time=82.91822ms
 56 bytes from 110.242.68.3: icmp_seq=2 ttl=44 time=17.331204ms

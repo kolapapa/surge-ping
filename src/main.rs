@@ -1,5 +1,6 @@
-mod icmp;
-mod unix;
+#[macro_use]
+extern crate log;
+extern crate pretty_env_logger;
 
 use std::time::Instant;
 use std::{
@@ -12,6 +13,9 @@ use once_cell::sync::Lazy;
 use parking_lot::Mutex;
 use structopt::StructOpt;
 
+mod icmp;
+mod unix;
+
 use crate::icmp::Token;
 use crate::unix::AsyncSocket;
 
@@ -23,7 +27,7 @@ async fn send(to: IpAddr, size: usize, interval: u64, socket: AsyncSocket) {
         let mut seq_cnt = 0;
         loop {
             interval.tick().await;
-            // println!("No.{} ({}bytes)", seq_cnt, size);
+            // info!("No.{} ({}bytes)", seq_cnt, size);
             let (mut packet, token) = icmp::make_echo_request(111, seq_cnt, size).unwrap();
             let send_time = Instant::now();
             let res = socket
@@ -34,7 +38,7 @@ async fn send(to: IpAddr, size: usize, interval: u64, socket: AsyncSocket) {
                     let mut m = CACHE.lock();
                     (*m).insert(token, send_time);
                 }
-                Err(e) => println!("No.{} send error: {}", seq_cnt, e),
+                Err(e) => error!("No.{} send error: {}", seq_cnt, e),
             };
             seq_cnt += 1;
         }
@@ -53,13 +57,13 @@ async fn recv_loop(socket: AsyncSocket) {
                 let send_time = (*w).remove(&reply.token);
                 if let Some(send_time) = send_time {
                     let dur = recv_time - send_time;
-                    println!(
+                    info!(
                         "{} bytes from {}: icmp_seq={} ttl={} time={:?}",
                         reply.size, reply.source, reply.sequence, reply.ttl, dur
                     );
                 }
             }
-            Err(e) => println!("{:?}", e),
+            Err(e) => error!("{:?}", e),
         }
     }
 }
@@ -96,6 +100,7 @@ struct Opt {
 
 #[tokio::main]
 async fn main() {
+    pretty_env_logger::init();
     let opt = Opt::from_args();
 
     let ip = tokio::net::lookup_host(format!("{}:0", opt.host))
@@ -104,6 +109,7 @@ async fn main() {
         .next()
         .map(|val| val.ip())
         .unwrap();
+    info!("PING {} ({}): {} data bytes", opt.host, ip, opt.size);
     let socket = AsyncSocket::new().expect("socket create error");
 
     send(ip, opt.size, opt.interval, socket.clone()).await;
