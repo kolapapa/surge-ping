@@ -1,5 +1,12 @@
 # surge
-same as `ping`, based on `tokio` + `socket2` + `packet`
+same as `ping`, based on `tokio 1.0` + `socket2` + `packet`
+
+### Todo
+
+- [ ] Add channel to manage the termination of ping
+- [ ] Calculate summary value
+- [ ] Perfect error handling.
+
 
 #### Simple run
 ```shell
