@@ -12,4 +12,5 @@ packet = "0.1.4"
 parking_lot = "0.11.1"
 rand = "0.8.0"
 socket2 = "0.3.19"
+structopt = "0.3.21"
 tokio = { version = "1.0.1", features = ["full"] }
