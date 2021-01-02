@@ -14,4 +14,4 @@ INFO  simple > Ok((EchoReply { ttl: 48, source: 220.181.38.148, sequence: 0, siz
 # License
 This project is licensed under either of
 
-Apache License, Version 2.0, (LICENSE-APACHE or http://www.apache.org/licenses/LICENSE-2.0) at your option.
+Apache License, Version 2.0, (LICENSE-APACHE or http://www.apache.org/licenses/LICENSE-2.0).
