@@ -6,7 +6,7 @@ use std::sync::Arc;
 use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 use tokio::io::unix::AsyncFd;
 
-#[derive(Clone)]
+#[derive(Debug, Clone)]
 pub struct AsyncSocket {
     inner: Arc<AsyncFd<Socket>>,
 }
