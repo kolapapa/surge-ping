@@ -5,10 +5,10 @@ extern crate pretty_env_logger;
 use std::time::Duration;
 
 use structopt::StructOpt;
-use surge::Pinger;
+use surge_ping::Pinger;
 
 #[derive(StructOpt, Debug)]
-#[structopt(name = "surge")]
+#[structopt(name = "surge-ping")]
 struct Opt {
     #[structopt(short = "h", long)]
     host: String,

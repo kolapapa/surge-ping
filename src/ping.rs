@@ -15,7 +15,7 @@ use crate::unix::AsyncSocket;
 /// ```
 /// use std::time::Duration;
 ///
-/// use surge::Pinger;
+/// use surge_ping::Pinger;
 ///
 /// #[tokio::main]
 /// async fn main() {
