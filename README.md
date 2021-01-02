@@ -10,3 +10,10 @@ sudo RUST_LOG=info ./target/debug/examples/simple -h www.baidu.com -s 56
 INFO  simple > Ok((EchoReply { ttl: 48, source: 220.181.38.148, sequence: 0, size: 56 }, 7.4106ms))
 
 ```
+
+# License
+This project is licensed under either of
+
+Apache License, Version 2.0, (LICENSE-APACHE or http://www.apache.org/licenses/LICENSE-2.0)
+MIT license (LICENSE-MIT or http://opensource.org/licenses/MIT)
+at your option.

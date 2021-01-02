@@ -3,6 +3,7 @@ name = "surge"
 version = "0.1.0"
 authors = ["kolapapa <milk346512016@gmail.com>"]
 edition = "2018"
+license = "Apache-2.0/MIT"
 repository = "https://github.com/kolapapa/surge"
 description = "Asynchronous ICMP ping library"
 keywords = ["tokio", "icmp", "ping"]
