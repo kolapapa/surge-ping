@@ -3,11 +3,24 @@ rust ping libray based on `tokio 1.0` + `socket2` + `packet`
 
 ### Example
 ```rust
-let mut pinger = Pinger::new("114.114.114.114".parse().unwrap()).unwrap();
-for idx in (..10) {
-    let (reply, dur) = pinger.ping(idx).await.unwrap();
-    println!("{} bytes from {}: icmp_seq={} ttl={} time={:?}", reply.size, reply.source, reply.sequence, dur);
+use std::time::Duration;
+
+use surge_ping::Pinger;
+
+#[tokio::main]
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let mut pinger = Pinger::new("114.114.114.114".parse()?)?;
+    pinger.interval(Duration::from_secs(1));
+    for idx in 0..10 {
+        let (reply, dur) = pinger.ping(idx).await?;
+        println!(
+            "{} bytes from {}: icmp_seq={} ttl={} time={:?}",
+            reply.size, reply.source, reply.sequence, reply.ttl, dur
+        );
+    }
+    Ok(())
 }
+
 ```
 
 #### Simple run
