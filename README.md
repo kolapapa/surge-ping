@@ -35,15 +35,17 @@ sudo RUST_LOG=info ./target/debug/examples/simple -h www.baidu.com -s 56
 INFO  simple > Ok((EchoReply { ttl: 48, source: 220.181.38.148, sequence: 0, size: 56 }, 7.4106ms))
 
 $ cargo build --example cmd
-sudo ./target/debug/examples/cmd -h www.baidu.com -c 3
+sudo ./target/debug/examples/cmd -h www.baidu.com -c 5
 PING www.baidu.com (220.181.38.149): 56 data bytes
-56 bytes from 220.181.38.149: icmp_seq=0 ttl=45 time=8.355 ms
-56 bytes from 220.181.38.149: icmp_seq=1 ttl=45 time=12.577 ms
-56 bytes from 220.181.38.149: icmp_seq=2 ttl=45 time=110.880 ms
+56 bytes from 220.181.38.149: icmp_seq=0 ttl=45 time=8.987 ms
+56 bytes from 220.181.38.149: icmp_seq=1 ttl=45 time=15.662 ms
+56 bytes from 220.181.38.149: icmp_seq=2 ttl=45 time=14.924 ms
+56 bytes from 220.181.38.149: icmp_seq=3 ttl=45 time=8.902 ms
+56 bytes from 220.181.38.149: icmp_seq=4 ttl=45 time=11.281 ms
 
 --- www.baidu.com ping statistics ---
-3 packets transmitted, 3 packets received, 0.00% packet loss
-round-trip min/avg/max/stddev = 8.355/43.937/110.880/47.367 ms
+5 packets transmitted, 5 packets received, 0.00% packet loss
+round-trip min/avg/max/stddev = 8.902/11.951/15.662/2.868 ms
 ```
 
 # License
