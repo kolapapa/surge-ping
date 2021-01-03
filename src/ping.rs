@@ -45,17 +45,17 @@ impl Pinger {
         })
     }
 
-    pub fn ident(&mut self, val: u16) -> &mut Self {
+    pub fn ident(&mut self, val: u16) -> &mut Pinger {
         self.ident = val;
         self
     }
 
-    pub fn size(&mut self, size: usize) -> &mut Self {
+    pub fn size(&mut self, size: usize) -> &mut Pinger {
         self.size = size;
         self
     }
 
-    pub fn timeout(&mut self, timeout: Duration) -> &mut Self {
+    pub fn timeout(&mut self, timeout: Duration) -> &mut Pinger {
         self.timeout = timeout;
         self
     }
