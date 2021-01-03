@@ -20,7 +20,7 @@ use crate::unix::AsyncSocket;
 /// #[tokio::main]
 /// async fn main() {
 ///     let mut pinger = Pinger::new("114.114.114.114".parse().unwrap()).unwrap();
-///     pinger.ident(123).size(56).timeout(Duration::from_secs(1));
+///     pinger.size(56).timeout(Duration::from_secs(1));
 ///     let result = pinger.ping(0).await;
 ///     println!("{:?}", result);
 /// }
@@ -60,6 +60,18 @@ impl Pinger {
         self
     }
 
+    async fn recv_reply(&self) -> Result<EchoReply> {
+        let mut buffer = [0; 2048];
+        loop {
+            let size = self.socket.recv(&mut buffer).await?;
+            let echo_reply = EchoReply::decode(&buffer[..size])?;
+            // check reply ident is same
+            if echo_reply.identifier == self.ident {
+                return Ok(echo_reply);
+            }
+        }
+    }
+
     pub async fn ping(&self, seq_cnt: u16) -> Result<(EchoReply, Duration)> {
         let sender = self.socket.clone();
         let mut packet = EchoRequest::new(self.ident, seq_cnt, self.size).encode()?;
@@ -72,12 +84,9 @@ impl Pinger {
                 .expect("socket send packet error");
         });
 
-        let mut buffer = [0; 2048];
-
         tokio::select! {
-            size = self.socket.recv(&mut buffer) => {
-                let echo_reply = EchoReply::decode(&buffer[..size?])?;
-                Ok((echo_reply, Instant::now() - send_time))
+            reply = self.recv_reply() => {
+                reply.map(|echo_reply| (echo_reply, Instant::now() - send_time))
             }
             _ = sleep(self.timeout) => Err(SurgeError::Timeout),
         }

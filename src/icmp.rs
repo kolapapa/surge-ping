@@ -40,11 +40,12 @@ pub struct EchoReply {
     pub ttl: u8,
     pub source: Ipv4Addr,
     pub sequence: u16,
+    pub identifier: u16,
     pub size: usize,
 }
 
 impl EchoReply {
-    pub fn decode(buf: &[u8]) -> Result<Self> {
+    pub fn decode(buf: &[u8]) -> Result<EchoReply> {
         // dont use `ip::v4::Packet::new(buf)?`.
         // Because `buf.as_ref().len() < packet.length() as usize` is always true.
         let ip_packet = ip::v4::Packet::no_payload(buf)?;
@@ -58,6 +59,7 @@ impl EchoReply {
             ttl: ip_packet.ttl(),
             source: ip_packet.source(),
             sequence: echo_reply.sequence(),
+            identifier: echo_reply.identifier(),
             size: echo_reply.payload().as_ref().len(),
         })
     }
