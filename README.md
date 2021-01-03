@@ -1,7 +1,16 @@
 # surge-ping
+[![Crates.io][crates-badge]][crates-url]
+[![MIT licensed][mit-badge]][mit-url]
+
+[crates-badge]: https://img.shields.io/badge/crates.io-v0.1.3-orange.svg
+[crates-url]: https://crates.io/crates/surge-ping
+[mit-badge]: https://img.shields.io/badge/license-MIT-blue.svg
+[mit-url]: https://github.com/kolapapa/surge-ping/blob/main/LICENSE
+
+
 rust ping libray based on `tokio 1.0` + `socket2` + `packet`
 
-### Example usage
+### Example
 ```rust
 use std::time::Duration;
 
@@ -23,7 +32,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ```
 
-#### Simple run
 There are two example programs that you can run on your own.
 ```shell
 $ git clone https://github.com/kolapapa/surge-ping.git
@@ -49,6 +57,6 @@ round-trip min/avg/max/stddev = 8.902/11.951/15.662/2.868 ms
 ```
 
 # License
-This project is licensed under either of
+This project is licensed under the [MIT license].
 
-Apache License, Version 2.0, (LICENSE-APACHE or http://www.apache.org/licenses/LICENSE-2.0).
+[MIT license]: https://github.com/kolapapa/surge-ping/blob/main/LICENSE
