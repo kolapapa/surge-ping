@@ -1,7 +1,7 @@
 # surge-ping
 rust ping libray based on `tokio 1.0` + `socket2` + `packet`
 
-### Example
+### Example usage
 ```rust
 use std::time::Duration;
 
