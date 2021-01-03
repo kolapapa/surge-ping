@@ -15,7 +15,6 @@ impl AsyncSocket {
     #[cfg(target_os = "linux")]
     pub fn new(interface: Option<&CStr>) -> io::Result<AsyncSocket> {
         let socket = Socket::new(Domain::ipv4(), Type::raw(), Some(Protocol::icmpv4()))?;
-        // #[cfg(target_os = "linux")]
         socket.bind_device(interface)?;
         socket.set_nonblocking(true)?;
         Ok(AsyncSocket {

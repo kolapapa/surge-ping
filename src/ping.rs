@@ -74,14 +74,12 @@ impl Pinger {
 
         let mut buffer = [0; 2048];
 
-        let answer;
         tokio::select! {
             size = self.socket.recv(&mut buffer) => {
                 let echo_reply = EchoReply::decode(&buffer[..size?])?;
-                answer = Ok((echo_reply, Instant::now() - send_time));
+                Ok((echo_reply, Instant::now() - send_time))
             }
-            _ = sleep(self.timeout) => answer = Err(SurgeError::Timeout),
-        };
-        answer
+            _ = sleep(self.timeout) => Err(SurgeError::Timeout),
+        }
     }
 }
