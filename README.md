@@ -1,5 +1,5 @@
 # surge-ping
-[![Crates.io](https://img.shields.io/badge/crates.io-v0.1.3-orange.svg)](https://crates.io/crates/surge-ping)
+[![Crates.io](https://img.shields.io/crates/v/surge-ping.svg)](https://crates.io/crates/surge-ping)
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/kolapapa/surge-ping/blob/main/LICENSE)
 [![API docs](https://docs.rs/surge-ping/badge.svg)](http://docs.rs/surge-ping)
 
