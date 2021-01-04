@@ -12,23 +12,17 @@ pub struct AsyncSocket {
 }
 
 impl AsyncSocket {
-    #[cfg(target_os = "linux")]
-    pub fn new(interface: Option<&CStr>) -> io::Result<AsyncSocket> {
-        let socket = Socket::new(Domain::ipv4(), Type::raw(), Some(Protocol::icmpv4()))?;
-        socket.bind_device(interface)?;
-        socket.set_nonblocking(true)?;
-        Ok(AsyncSocket {
-            inner: Arc::new(AsyncFd::new(socket)?),
-        })
-    }
-
-    #[cfg(not(target_os = "linux"))]
     pub fn new() -> io::Result<AsyncSocket> {
         let socket = Socket::new(Domain::ipv4(), Type::raw(), Some(Protocol::icmpv4()))?;
         socket.set_nonblocking(true)?;
         Ok(AsyncSocket {
             inner: Arc::new(AsyncFd::new(socket)?),
         })
+    }
+
+    #[cfg(target_os = "linux")]
+    pub fn bind_device(&self, interface: Option<&CStr>) -> io::Result<()> {
+        self.inner.get_ref().bind_device(interface)
     }
 
     pub async fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
