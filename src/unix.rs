@@ -22,7 +22,7 @@ impl AsyncSocket {
 
     #[cfg(target_os = "linux")]
     pub fn bind_device(&self, interface: Option<&CStr>) -> io::Result<()> {
-        self.inner.bind_device(interface)?
+        self.inner.bind_device(interface)
     }
 
     pub async fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
