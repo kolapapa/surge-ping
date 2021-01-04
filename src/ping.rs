@@ -50,7 +50,7 @@ impl Pinger {
     #[cfg(target_os = "linux")]
     pub fn bind_device(&mut self, interface: Option<&CStr>) -> Result<&mut Pinger> {
         self.socket.bind_device(interface)?;
-        self
+        Ok(self)
     }
 
     pub fn ident(&mut self, val: u16) -> &mut Pinger {
