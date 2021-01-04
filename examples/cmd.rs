@@ -1,3 +1,5 @@
+#[cfg(target_os = "linux")]
+use std::ffi::CString;
 use std::time::Duration;
 
 use structopt::StructOpt;
@@ -114,6 +116,13 @@ struct Opt {
     #[structopt(short = "c", long, default_value = "5")]
     count: u16,
 
+    /// Source multicast packets with the given interface address.  This flag only applies if the ping
+    /// destination is a multicast address.
+    #[structopt(short = "I", long)]
+    iface: Option<String>,
+
+    /// Specify a timeout, in seconds, before ping exits regardless of
+    /// how many packets have been received.
     #[structopt(short = "t", long, default_value = "1")]
     timeout: u64,
 }
@@ -132,6 +141,12 @@ async fn main() {
     let mut interval = time::interval(Duration::from_millis((opt.interval * 1000f64) as u64));
     let mut pinger = Pinger::new(ip).unwrap();
     pinger.timeout(Duration::from_secs(opt.timeout));
+
+    #[cfg(target_os = "linux")]
+    let interface = opt.iface.map(|val| CString::new(val).unwrap());
+    #[cfg(target_os = "linux")]
+    pinger.bind_device(interface.as_deref()).unwrap();
+
     let mut answer = Answer::new(&opt.host);
     println!("PING {} ({}): {} data bytes", opt.host, ip, opt.size);
     for idx in 0..opt.count {
