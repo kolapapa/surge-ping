@@ -27,3 +27,6 @@ name = "simple"
 
 [[example]]
 name = "cmd"
+
+[[example]]
+name = "multi_ping"
