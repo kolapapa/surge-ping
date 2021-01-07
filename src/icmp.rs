@@ -50,12 +50,15 @@ impl EchoReply {
         // dont use `ip::v4::Packet::new(buf)?`.
         // Because `buf.as_ref().len() < packet.length() as usize` is always true.
         let ip_packet = ip::v4::Packet::no_payload(buf)?;
-        trace!("IP Packet: {:?}", ip_packet);
         let packet = icmp::Packet::new(ip_packet.payload())?;
-        trace!("ICMP Packet: {:?}", packet);
         let echo_reply = packet.echo()?;
-        trace!("Echo Packet: {:?}", echo_reply);
         if !echo_reply.is_reply() {
+            trace!(
+                "Source({}) Kind({:?}) Ident: {}",
+                ip_packet.source(),
+                packet.kind(),
+                echo_reply.identifier()
+            );
             return Err(SurgeError::KindError(packet.kind()));
         }
 

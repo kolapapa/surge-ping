@@ -5,6 +5,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use packet::icmp::Kind;
 use rand::random;
 use tokio::task;
 use tokio::time::sleep;
@@ -72,10 +73,19 @@ impl Pinger {
         let mut buffer = [0; 2048];
         loop {
             let size = self.socket.recv(&mut buffer).await?;
-            let echo_reply = EchoReply::decode(&buffer[..size])?;
-            // check reply ident is same
-            if echo_reply.identifier == self.ident {
-                return Ok(echo_reply);
+            match EchoReply::decode(&buffer[..size]) {
+                Ok(reply) => {
+                    // check reply ident is same
+                    if reply.identifier == self.ident {
+                        return Ok(reply);
+                    }
+                }
+                Err(SurgeError::KindError(Kind::EchoRequest)) => {
+                    continue;
+                }
+                Err(e) => {
+                    return Err(e);
+                }
             }
         }
     }
