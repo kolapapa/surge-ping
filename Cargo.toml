@@ -10,6 +10,7 @@ keywords = ["tokio", "icmp", "ping"]
 categories = ["network-programming", "asynchronous"]
 
 [dependencies]
+log = "0.4.11"
 packet = "0.1.4"
 rand = "0.8.0"
 socket2 = "0.3.19"
