@@ -51,6 +51,10 @@ PING www.baidu.com (220.181.38.149): 56 data bytes
 round-trip min/avg/max/stddev = 8.902/11.951/15.662/2.868 ms
 ```
 
+# Notice
+If you are **time sensitive**, please do not use `asynchronous ping program`, because if there are a large number of asynchronous events waiting to wake up, it will cause inaccurate calculation time. You can directly use the `ping command` of the operating system.
+
+
 # License
 This project is licensed under the [MIT license].
 
