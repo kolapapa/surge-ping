@@ -1,11 +1,14 @@
 #[cfg(target_os = "linux")]
 use std::ffi::CStr;
 use std::{
+    collections::HashMap,
     net::{IpAddr, SocketAddr},
+    sync::Arc,
     time::{Duration, Instant},
 };
 
 use packet::icmp::Kind;
+use parking_lot::Mutex;
 use rand::random;
 use tokio::task;
 use tokio::time::sleep;
@@ -13,6 +16,29 @@ use tokio::time::sleep;
 use crate::error::{Result, SurgeError};
 use crate::icmp::{EchoReply, EchoRequest};
 use crate::unix::AsyncSocket;
+
+type Token = (u16, u16);
+
+#[derive(Debug, Clone)]
+struct Cache {
+    inner: Arc<Mutex<HashMap<Token, Instant>>>,
+}
+
+impl Cache {
+    fn new() -> Cache {
+        Cache {
+            inner: Arc::new(Mutex::new(HashMap::new())),
+        }
+    }
+
+    fn insert(&self, ident: u16, seq_cnt: u16, time: Instant) {
+        self.inner.lock().insert((ident, seq_cnt), time);
+    }
+
+    fn remove(&self, ident: u16, seq_cnt: u16) -> Option<Instant> {
+        self.inner.lock().remove(&(ident, seq_cnt))
+    }
+}
 
 /// # Examples
 /// ```
@@ -35,6 +61,7 @@ pub struct Pinger {
     size: usize,
     timeout: Duration,
     socket: AsyncSocket,
+    cache: Cache,
 }
 
 impl Pinger {
@@ -45,6 +72,7 @@ impl Pinger {
             size: 56,
             timeout: Duration::from_secs(2),
             socket: AsyncSocket::new()?,
+            cache: Cache::new(),
         })
     }
 
@@ -69,20 +97,20 @@ impl Pinger {
         self
     }
 
-    async fn recv_reply(&self) -> Result<EchoReply> {
+    async fn recv_reply(&self, seq_cnt: u16) -> Result<(EchoReply, Duration)> {
         let mut buffer = [0; 2048];
         loop {
             let size = self.socket.recv(&mut buffer).await?;
             match EchoReply::decode(&buffer[..size]) {
                 Ok(reply) => {
                     // check reply ident is same
-                    if reply.identifier == self.ident {
-                        return Ok(reply);
+                    if reply.identifier == self.ident && reply.sequence == seq_cnt {
+                        if let Some(ins) = self.cache.remove(self.ident, seq_cnt) {
+                            return Ok((reply, Instant::now() - ins));
+                        }
                     }
                 }
-                Err(SurgeError::KindError(Kind::EchoRequest)) => {
-                    continue;
-                }
+                Err(SurgeError::KindError(Kind::EchoRequest)) => continue,
                 Err(e) => {
                     return Err(e);
                 }
@@ -94,19 +122,27 @@ impl Pinger {
         let sender = self.socket.clone();
         let mut packet = EchoRequest::new(self.ident, seq_cnt, self.size).encode()?;
         let sock_addr = SocketAddr::new(self.host, 0);
-        let send_time = Instant::now();
+        let ident = self.ident;
+        let cache = self.cache.clone();
         task::spawn(async move {
             let _size = sender
                 .send_to(&mut packet, &sock_addr.into())
                 .await
                 .expect("socket send packet error");
+            cache.insert(ident, seq_cnt, Instant::now());
         });
 
         tokio::select! {
-            reply = self.recv_reply() => {
-                reply.map(|echo_reply| (echo_reply, Instant::now() - send_time))
-            }
-            _ = sleep(self.timeout) => Err(SurgeError::Timeout),
+            reply = self.recv_reply(seq_cnt) => {
+                reply.map_err(|err| {
+                    self.cache.remove(ident, seq_cnt);
+                    err
+                })
+            },
+            _ = sleep(self.timeout) => {
+                self.cache.remove(ident, seq_cnt);
+                Err(SurgeError::Timeout)
+            },
         }
     }
 }

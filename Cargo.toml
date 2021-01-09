@@ -12,6 +12,7 @@ categories = ["network-programming", "asynchronous"]
 [dependencies]
 log = "0.4.11"
 packet = "0.1.4"
+parking_lot = "0.11.1"
 rand = "0.8.0"
 socket2 = "0.3.19"
 thiserror = "1.0.23"
