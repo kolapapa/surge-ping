@@ -16,4 +16,6 @@ pub enum SurgeError {
     KindError(Kind),
     #[error("timeout error")]
     Timeout,
+    #[error("other icmp message")]
+    OtherICMP,
 }

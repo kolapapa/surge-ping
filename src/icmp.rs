@@ -1,4 +1,4 @@
-use std::net::Ipv4Addr;
+use std::net::{IpAddr, Ipv4Addr};
 
 use log::trace;
 use packet::builder::Builder;
@@ -46,28 +46,32 @@ pub struct EchoReply {
 }
 
 impl EchoReply {
-    pub fn decode(buf: &[u8]) -> Result<EchoReply> {
+    pub fn decode(addr: IpAddr, buf: &[u8]) -> Result<EchoReply> {
         // dont use `ip::v4::Packet::new(buf)?`.
         // Because `buf.as_ref().len() < packet.length() as usize` is always true.
         let ip_packet = ip::v4::Packet::no_payload(buf)?;
-        let packet = icmp::Packet::new(ip_packet.payload())?;
-        let echo_reply = packet.echo()?;
-        if !echo_reply.is_reply() {
-            trace!(
-                "Source({}) Kind({:?}) Ident: {}",
-                ip_packet.source(),
-                packet.kind(),
-                echo_reply.identifier()
-            );
-            return Err(SurgeError::KindError(packet.kind()));
+        if ip_packet.source() != addr {
+            return Err(SurgeError::OtherICMP);
         }
-
-        Ok(EchoReply {
-            ttl: ip_packet.ttl(),
-            source: ip_packet.source(),
-            sequence: echo_reply.sequence(),
-            identifier: echo_reply.identifier(),
-            size: echo_reply.payload().as_ref().len(),
-        })
+        let packet = icmp::Packet::new(ip_packet.payload())?;
+        if packet.kind() == icmp::Kind::EchoReply {
+            let echo_reply = packet.echo()?;
+            Ok(EchoReply {
+                ttl: ip_packet.ttl(),
+                source: ip_packet.source(),
+                sequence: echo_reply.sequence(),
+                identifier: echo_reply.identifier(),
+                size: echo_reply.payload().as_ref().len(),
+            })
+        } else {
+            trace!(
+                "type={:?},code={},src={},dst={}",
+                packet.kind(),
+                packet.code(),
+                ip_packet.source(),
+                ip_packet.destination()
+            );
+            Err(SurgeError::KindError(packet.kind()))
+        }
     }
 }

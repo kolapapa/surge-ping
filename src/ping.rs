@@ -101,7 +101,7 @@ impl Pinger {
         let mut buffer = [0; 2048];
         loop {
             let size = self.socket.recv(&mut buffer).await?;
-            match EchoReply::decode(&buffer[..size]) {
+            match EchoReply::decode(self.host, &buffer[..size]) {
                 Ok(reply) => {
                     // check reply ident is same
                     if reply.identifier == self.ident && reply.sequence == seq_cnt {
@@ -111,6 +111,7 @@ impl Pinger {
                     }
                 }
                 Err(SurgeError::KindError(Kind::EchoRequest)) => continue,
+                Err(SurgeError::OtherICMP) => continue,
                 Err(e) => {
                     return Err(e);
                 }
