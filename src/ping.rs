@@ -109,6 +109,7 @@ impl Pinger {
                             return Ok((reply, Instant::now() - ins));
                         }
                     }
+                    continue;
                 }
                 Err(SurgeError::KindError(Kind::EchoRequest)) => continue,
                 Err(SurgeError::OtherICMP) => continue,
