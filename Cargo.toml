@@ -1,6 +1,6 @@
 [package]
 name = "surge-ping"
-version = "0.1.8"
+version = "0.1.9"
 authors = ["kolapapa <milk346512016@gmail.com>"]
 edition = "2018"
 license = "MIT"
@@ -10,19 +10,19 @@ keywords = ["tokio", "icmp", "ping"]
 categories = ["network-programming", "asynchronous"]
 
 [dependencies]
-log = "0.4.11"
+log = "0.4.14"
 packet = "0.1.4"
 parking_lot = "0.11.1"
-rand = "0.8.0"
+rand = "0.8.3"
 socket2 = "0.3.19"
-thiserror = "1.0.23"
-tokio = { version = "1.1", features = ["time", "macros"] }
+thiserror = "1.0.24"
+tokio = { version = "1.2", features = ["time", "macros"] }
 
 [dev-dependencies]
 log = "0.4"
 structopt = "0.3"
 pretty_env_logger = "0.4"
-tokio = { version = "1.1", features = ["full"] }
+tokio = { version = "1", features = ["full"] }
 
 [[example]]
 name = "simple"
