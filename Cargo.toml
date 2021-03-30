@@ -1,6 +1,6 @@
 [package]
 name = "surge-ping"
-version = "0.1.9"
+version = "0.2.0"
 authors = ["kolapapa <milk346512016@gmail.com>"]
 edition = "2018"
 license = "MIT"
@@ -14,9 +14,9 @@ log = "0.4.14"
 packet = "0.1.4"
 parking_lot = "0.11.1"
 rand = "0.8.3"
-socket2 = "0.3.19"
+socket2 = { version = "0.4.0", features = ["all"]}
 thiserror = "1.0.24"
-tokio = { version = "1.2", features = ["time", "macros"] }
+tokio = { version = "1.4", features = ["time", "macros"] }
 
 [dev-dependencies]
 log = "0.4"

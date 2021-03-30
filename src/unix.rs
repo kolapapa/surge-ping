@@ -1,6 +1,5 @@
-#[cfg(target_os = "linux")]
-use std::ffi::CStr;
 use std::io;
+use std::mem::MaybeUninit;
 use std::sync::Arc;
 
 use socket2::{Domain, Protocol, SockAddr, Socket, Type};
@@ -13,7 +12,7 @@ pub struct AsyncSocket {
 
 impl AsyncSocket {
     pub fn new() -> io::Result<AsyncSocket> {
-        let socket = Socket::new(Domain::ipv4(), Type::raw(), Some(Protocol::icmpv4()))?;
+        let socket = Socket::new(Domain::IPV4, Type::RAW, Some(Protocol::ICMPV4))?;
         socket.set_nonblocking(true)?;
         Ok(AsyncSocket {
             inner: Arc::new(AsyncFd::new(socket)?),
@@ -21,11 +20,11 @@ impl AsyncSocket {
     }
 
     #[cfg(target_os = "linux")]
-    pub fn bind_device(&self, interface: Option<&CStr>) -> io::Result<()> {
+    pub fn bind_device(&self, interface: Option<&[u8]>) -> io::Result<()> {
         self.inner.get_ref().bind_device(interface)
     }
 
-    pub async fn recv(&self, buf: &mut [u8]) -> io::Result<usize> {
+    pub async fn recv(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<usize> {
         loop {
             let mut guard = self.inner.readable().await?;
 

@@ -1,7 +1,6 @@
-#[cfg(target_os = "linux")]
-use std::ffi::CStr;
 use std::{
     collections::HashMap,
+    mem::MaybeUninit,
     net::{IpAddr, SocketAddr},
     sync::Arc,
     time::{Duration, Instant},
@@ -77,7 +76,7 @@ impl Pinger {
     }
 
     #[cfg(target_os = "linux")]
-    pub fn bind_device(&mut self, interface: Option<&CStr>) -> Result<&mut Pinger> {
+    pub fn bind_device(&mut self, interface: Option<&[u8]>) -> Result<&mut Pinger> {
         self.socket.bind_device(interface)?;
         Ok(self)
     }
@@ -98,10 +97,11 @@ impl Pinger {
     }
 
     async fn recv_reply(&self, seq_cnt: u16) -> Result<(EchoReply, Duration)> {
-        let mut buffer = [0; 2048];
+        let mut buffer = [MaybeUninit::new(0); 2048];
         loop {
             let size = self.socket.recv(&mut buffer).await?;
-            match EchoReply::decode(self.host, &buffer[..size]) {
+            let buf = unsafe { assume_init(&buffer[..size]) };
+            match EchoReply::decode(self.host, buf) {
                 Ok(reply) => {
                     // check reply ident is same
                     if reply.identifier == self.ident && reply.sequence == seq_cnt {
@@ -147,4 +147,10 @@ impl Pinger {
             },
         }
     }
+}
+
+/// Assume the `buf`fer to be initialised.
+// TODO: replace with `MaybeUninit::slice_assume_init_ref` once stable.
+unsafe fn assume_init(buf: &[MaybeUninit<u8>]) -> &[u8] {
+    &*(buf as *const [MaybeUninit<u8>] as *const [u8])
 }
