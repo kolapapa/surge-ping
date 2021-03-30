@@ -3,7 +3,7 @@
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/kolapapa/surge-ping/blob/main/LICENSE)
 [![API docs](https://docs.rs/surge-ping/badge.svg)](http://docs.rs/surge-ping)
 
-rust ping libray based on `tokio` + `socket2` + `packet`
+rust ping libray based on `tokio` + `socket2` + `packet`.
 
 ### Example
 ```rust
@@ -15,8 +15,8 @@ use surge_ping::Pinger;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let mut pinger = Pinger::new("114.114.114.114".parse()?)?;
     pinger.timeout(Duration::from_secs(1));
-    for idx in 0..10 {
-        let (reply, dur) = pinger.ping(idx).await?;
+    for seq_cnt in 0..10 {
+        let (reply, dur) = pinger.ping(seq_cnt).await?;
         println!(
             "{} bytes from {}: icmp_seq={} ttl={} time={:?}",
             reply.size, reply.source, reply.sequence, reply.ttl, dur
@@ -26,6 +26,12 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 ```
+
+You can send ICMP packets with custom interface
+```rust
+pinger.bind_device(Some("eth0".as_bytes()))?;
+```
+
 
 There are two example programs that you can run on your own.
 ```shell

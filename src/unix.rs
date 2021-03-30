@@ -19,7 +19,7 @@ impl AsyncSocket {
         })
     }
 
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))]
     pub fn bind_device(&self, interface: Option<&[u8]>) -> io::Result<()> {
         self.inner.get_ref().bind_device(interface)
     }
