@@ -1,5 +1,3 @@
-#[cfg(target_os = "linux")]
-use std::ffi::CStr;
 use std::io;
 use std::mem::MaybeUninit;
 use std::sync::Arc;

@@ -1,5 +1,3 @@
-#[cfg(target_os = "linux")]
-use std::ffi::CStr;
 use std::{
     collections::HashMap,
     mem::MaybeUninit,
@@ -78,7 +76,7 @@ impl Pinger {
     }
 
     #[cfg(target_os = "linux")]
-    pub fn bind_device(&mut self, interface: Option<&CStr>) -> Result<&mut Pinger> {
+    pub fn bind_device(&mut self, interface: Option<&[u8]>) -> Result<&mut Pinger> {
         self.socket.bind_device(interface)?;
         Ok(self)
     }

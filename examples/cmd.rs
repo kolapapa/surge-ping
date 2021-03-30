@@ -1,5 +1,3 @@
-#[cfg(target_os = "linux")]
-use std::ffi::CString;
 use std::time::Duration;
 
 use structopt::StructOpt;
@@ -143,9 +141,9 @@ async fn main() {
     pinger.timeout(Duration::from_secs(opt.timeout));
 
     #[cfg(target_os = "linux")]
-    let interface = opt.iface.map(|val| CString::new(val).unwrap());
-    #[cfg(target_os = "linux")]
-    pinger.bind_device(interface.as_deref()).unwrap();
+    pinger
+        .bind_device(opt.iface.map(|val| val.as_bytes()))
+        .unwrap();
 
     let mut answer = Answer::new(&opt.host);
     println!("PING {} ({}): {} data bytes", opt.host, ip, opt.size);
