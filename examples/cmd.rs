@@ -142,7 +142,7 @@ async fn main() {
 
     #[cfg(target_os = "linux")]
     pinger
-        .bind_device(opt.iface.map(|val| val.as_bytes()))
+        .bind_device(opt.iface.as_deref().map(|val| val.as_bytes()))
         .unwrap();
 
     let mut answer = Answer::new(&opt.host);
