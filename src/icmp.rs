@@ -36,16 +36,23 @@ impl EchoRequest {
     }
 }
 
+/// `EchoReply` struct, which contains some packet information.
 #[derive(Debug)]
 pub struct EchoReply {
+    /// IP Time To Live for outgoing packets.
     pub ttl: u8,
+    /// Source address of ICMP package.
     pub source: Ipv4Addr,
+    /// Sequence of ICMP package.
     pub sequence: u16,
+    /// Identifier of ICMP package.
     pub identifier: u16,
+    /// Size of ICMP package.
     pub size: usize,
 }
 
 impl EchoReply {
+    /// Unpack IP packets received from socket as `EchoReply` struct.
     pub fn decode(addr: IpAddr, buf: &[u8]) -> Result<EchoReply> {
         // dont use `ip::v4::Packet::new(buf)?`.
         // Because `buf.as_ref().len() < packet.length() as usize` is always true.

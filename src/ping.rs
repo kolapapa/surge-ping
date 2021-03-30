@@ -39,6 +39,8 @@ impl Cache {
     }
 }
 
+/// A Ping struct represents the state of one particular ping instance.
+///
 /// # Examples
 /// ```
 /// use std::time::Duration;
@@ -64,6 +66,7 @@ pub struct Pinger {
 }
 
 impl Pinger {
+    /// Creates a new Ping instance from `IpAddr`.
     pub fn new(host: IpAddr) -> Result<Pinger> {
         Ok(Pinger {
             host,
@@ -75,22 +78,34 @@ impl Pinger {
         })
     }
 
-    #[cfg(target_os = "linux")]
+    /// Sets the value for the `SO_BINDTODEVICE` option on this socket.
+    ///
+    /// If a socket is bound to an interface, only packets received from that
+    /// particular interface are processed by the socket. Note that this only
+    /// works for some socket types, particularly `AF_INET` sockets.
+    ///
+    /// If `interface` is `None` or an empty string it removes the binding.
+    ///
+    /// This function is only available on Fuchsia and Linux.
+    #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))]
     pub fn bind_device(&mut self, interface: Option<&[u8]>) -> Result<&mut Pinger> {
         self.socket.bind_device(interface)?;
         Ok(self)
     }
 
+    /// Set the identification of ICMP.
     pub fn ident(&mut self, val: u16) -> &mut Pinger {
         self.ident = val;
         self
     }
 
+    /// Set the packet size.(default: 56)
     pub fn size(&mut self, size: usize) -> &mut Pinger {
         self.size = size;
         self
     }
 
+    /// The timeout of each Ping, in seconds.(default: 2s)
     pub fn timeout(&mut self, timeout: Duration) -> &mut Pinger {
         self.timeout = timeout;
         self
@@ -120,6 +135,7 @@ impl Pinger {
         }
     }
 
+    /// Send Ping request with sequence number.
     pub async fn ping(&self, seq_cnt: u16) -> Result<(EchoReply, Duration)> {
         let sender = self.socket.clone();
         let mut packet = EchoRequest::new(self.ident, seq_cnt, self.size).encode()?;

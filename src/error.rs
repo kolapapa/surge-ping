@@ -6,6 +6,8 @@ use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, SurgeError>;
 
+/// An error resulting from a ping option-setting or send/receive operation.
+///
 #[derive(Error, Debug)]
 pub enum SurgeError {
     #[error("packet parse error")]
