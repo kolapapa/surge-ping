@@ -146,7 +146,7 @@ impl Pinger {
             let _size = sender
                 .send_to(&mut packet, &sock_addr.into())
                 .await
-                .expect("socket send packet error");
+                .ok();
             cache.insert(ident, seq_cnt, Instant::now());
         });
 
