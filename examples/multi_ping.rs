@@ -33,7 +33,14 @@ async fn ping(addr: IpAddr, size: usize) -> Result<(), Box<dyn std::error::Error
         match pinger.ping(idx).await {
             Ok((reply, dur)) => println!(
                 "{} bytes from {}: icmp_seq={} ttl={} time={:?}",
-                reply.size, reply.source, reply.sequence, reply.ttl, dur
+                reply.size,
+                reply.source,
+                reply.sequence,
+                match reply.ttl {
+                    Some(ttl) => format!("{}", ttl),
+                    None => "?".to_string(),
+                },
+                dur
             ),
             Err(e) => println!("{} ping {}", addr, e),
         };

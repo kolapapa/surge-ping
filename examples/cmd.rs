@@ -156,7 +156,10 @@ async fn main() {
                     reply.size,
                     reply.source,
                     reply.sequence,
-                    reply.ttl,
+                    match reply.ttl {
+                        Some(ttl) => format!("{}", ttl),
+                        None => "?".to_string(),
+                    },
                     dur.as_secs_f64() * 1000f64
                 );
                 answer.update(Some(dur));
