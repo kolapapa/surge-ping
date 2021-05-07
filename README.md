@@ -3,7 +3,7 @@
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/kolapapa/surge-ping/blob/main/LICENSE)
 [![API docs](https://docs.rs/surge-ping/badge.svg)](http://docs.rs/surge-ping)
 
-rust ping libray based on `tokio` + `socket2` + `packet`.
+rust ping libray based on `tokio` + `socket2` + `pnet_packet`.
 
 ### Example
 ```rust
