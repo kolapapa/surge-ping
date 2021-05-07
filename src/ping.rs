@@ -6,7 +6,6 @@ use std::{
     time::{Duration, Instant},
 };
 
-use packet::icmp::Kind;
 use parking_lot::Mutex;
 use rand::random;
 use tokio::task;
@@ -73,7 +72,7 @@ impl Pinger {
             ident: random(),
             size: 56,
             timeout: Duration::from_secs(2),
-            socket: AsyncSocket::new()?,
+            socket: AsyncSocket::new(host)?,
             cache: Cache::new(),
         })
     }
@@ -105,7 +104,7 @@ impl Pinger {
         self
     }
 
-    /// The timeout of each Ping, in seconds.(default: 2s)
+    /// The timeout of each Ping, in seconds. (default: 2s)
     pub fn timeout(&mut self, timeout: Duration) -> &mut Pinger {
         self.timeout = timeout;
         self
@@ -126,7 +125,8 @@ impl Pinger {
                     }
                     continue;
                 }
-                Err(SurgeError::KindError(Kind::EchoRequest)) => continue,
+                Err(SurgeError::NotEchoReply(_)) => continue,
+                Err(SurgeError::NotV6EchoReply(_)) => continue,
                 Err(SurgeError::OtherICMP) => continue,
                 Err(e) => {
                     return Err(e);
@@ -138,7 +138,7 @@ impl Pinger {
     /// Send Ping request with sequence number.
     pub async fn ping(&self, seq_cnt: u16) -> Result<(EchoReply, Duration)> {
         let sender = self.socket.clone();
-        let mut packet = EchoRequest::new(self.ident, seq_cnt, self.size).encode()?;
+        let mut packet = EchoRequest::new(self.host, self.ident, seq_cnt, self.size).encode()?;
         let sock_addr = SocketAddr::new(self.host, 0);
         let ident = self.ident;
         let cache = self.cache.clone();

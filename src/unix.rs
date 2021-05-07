@@ -1,6 +1,6 @@
-use std::io;
 use std::mem::MaybeUninit;
 use std::sync::Arc;
+use std::{io, net::IpAddr};
 
 use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 use tokio::io::unix::AsyncFd;
@@ -11,8 +11,20 @@ pub struct AsyncSocket {
 }
 
 impl AsyncSocket {
-    pub fn new() -> io::Result<AsyncSocket> {
-        let socket = Socket::new(Domain::IPV4, Type::RAW, Some(Protocol::ICMPV4))?;
+    pub fn new(addr: IpAddr) -> io::Result<AsyncSocket> {
+        let socket = match addr {
+            IpAddr::V4(_) => Socket::new(Domain::IPV4, Type::RAW, Some(Protocol::ICMPV4))?,
+            IpAddr::V6(_) => Socket::new(Domain::IPV6, Type::RAW, Some(Protocol::ICMPV6))?,
+        };
+
+        // TODO: Type filtering,
+        // https://tools.ietf.org/html/rfc3542#section-3.2. Currently blocked
+        // on https://github.com/rust-lang/socket2/issues/199
+
+        // TODO: Get access to the hop limits
+        // https://tools.ietf.org/html/rfc3542#section-4, to show the TTL for
+        // ICMPv6.
+
         socket.set_nonblocking(true)?;
         Ok(AsyncSocket {
             inner: Arc::new(AsyncFd::new(socket)?),
