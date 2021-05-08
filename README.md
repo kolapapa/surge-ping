@@ -18,7 +18,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     for seq_cnt in 0..10 {
         let (reply, dur) = pinger.ping(seq_cnt).await?;
         println!(
-            "{} bytes from {}: icmp_seq={} ttl={} time={:?}",
+            "{} bytes from {}: icmp_seq={} ttl={:?} time={:?}",
             reply.size, reply.source, reply.sequence, reply.ttl, dur
         );
     }
@@ -41,16 +41,16 @@ $ cd surge-ping
 
 $ cargo build --example simple
 sudo RUST_LOG=info ./target/debug/examples/simple -h www.baidu.com -s 56
-INFO  simple > Ok((EchoReply { ttl: 48, source: 220.181.38.148, sequence: 0, size: 56 }, 7.4106ms))
+INFO  simple > Ok((EchoReply { ttl: Some(48), source: 220.181.38.148, sequence: 0, identifier: 111, size: 64 }, 7.4106ms))
 
 $ cargo build --example cmd
 sudo ./target/debug/examples/cmd -h www.baidu.com -c 5
 PING www.baidu.com (220.181.38.149): 56 data bytes
-56 bytes from 220.181.38.149: icmp_seq=0 ttl=45 time=8.987 ms
-56 bytes from 220.181.38.149: icmp_seq=1 ttl=45 time=15.662 ms
-56 bytes from 220.181.38.149: icmp_seq=2 ttl=45 time=14.924 ms
-56 bytes from 220.181.38.149: icmp_seq=3 ttl=45 time=8.902 ms
-56 bytes from 220.181.38.149: icmp_seq=4 ttl=45 time=11.281 ms
+64 bytes from 220.181.38.149: icmp_seq=0 ttl=45 time=8.987 ms
+64 bytes from 220.181.38.149: icmp_seq=1 ttl=45 time=15.662 ms
+64 bytes from 220.181.38.149: icmp_seq=2 ttl=45 time=14.924 ms
+64 bytes from 220.181.38.149: icmp_seq=3 ttl=45 time=8.902 ms
+64 bytes from 220.181.38.149: icmp_seq=4 ttl=45 time=11.281 ms
 
 --- www.baidu.com ping statistics ---
 5 packets transmitted, 5 packets received, 0.00% packet loss
