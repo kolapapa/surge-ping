@@ -50,7 +50,10 @@ async fn main() {
         .unwrap();
 
     let mut pinger = Pinger::new(ip).unwrap();
-    pinger.ident(111).size(56).timeout(Duration::from_secs(1));
+    pinger
+        .ident(111)
+        .size(opt.size)
+        .timeout(Duration::from_secs(1));
     let answer = pinger.ping(0).await;
     info!("{:?}", answer);
 }

@@ -8,7 +8,7 @@ use pnet_packet::{
     },
     icmpv6::{Icmpv6Packet, Icmpv6Types, MutableIcmpv6Packet},
     ipv4::Ipv4Packet,
-    Packet, PacketSize,
+    Packet,
 };
 
 use crate::error::{MalformedPacketError, Result, SurgeError};
@@ -127,7 +127,8 @@ fn decode_icmpv4(addr: IpAddr, buf: &[u8]) -> Result<EchoReply> {
         source: addr,
         sequence: echo_reply_packet.get_sequence_number(),
         identifier: echo_reply_packet.get_identifier(),
-        size: echo_reply_packet.packet_size(),
+        // TODO: When `EchoReplyPacket::packet_size()` can directly use.
+        size: echo_reply_packet.packet().len(),
     })
 }
 
