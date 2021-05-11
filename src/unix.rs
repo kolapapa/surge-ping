@@ -36,6 +36,10 @@ impl AsyncSocket {
         self.inner.get_ref().bind_device(interface)
     }
 
+    pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
+        self.inner.get_ref().set_ttl(ttl)
+    }
+
     pub async fn recv(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<usize> {
         loop {
             let mut guard = self.inner.readable().await?;
