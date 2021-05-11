@@ -12,7 +12,7 @@ use tokio::task;
 use tokio::time::sleep;
 
 use crate::error::{Result, SurgeError};
-use crate::icmp::{EchoReply, EchoRequest};
+use crate::icmp::{EchoRequest, IcmpReply};
 use crate::unix::AsyncSocket;
 
 type Token = (u16, u16);
@@ -118,12 +118,12 @@ impl Pinger {
         self
     }
 
-    async fn recv_reply(&self, seq_cnt: u16) -> Result<(EchoReply, Duration)> {
+    async fn recv_reply(&self, seq_cnt: u16) -> Result<(IcmpReply, Duration)> {
         let mut buffer = [MaybeUninit::new(0); 2048];
         loop {
             let size = self.socket.recv(&mut buffer).await?;
             let buf = unsafe { assume_init(&buffer[..size]) };
-            match EchoReply::decode(self.host, buf) {
+            match IcmpReply::decode(buf) {
                 Ok(reply) => {
                     // check reply ident is same
                     if reply.identifier == self.ident && reply.sequence == seq_cnt {
@@ -133,8 +133,6 @@ impl Pinger {
                     }
                     continue;
                 }
-                Err(SurgeError::NotEchoReply(_)) => continue,
-                Err(SurgeError::NotV6EchoReply(_)) => continue,
                 Err(SurgeError::OtherICMP) => continue,
                 Err(e) => {
                     return Err(e);
@@ -144,7 +142,7 @@ impl Pinger {
     }
 
     /// Send Ping request with sequence number.
-    pub async fn ping(&self, seq_cnt: u16) -> Result<(EchoReply, Duration)> {
+    pub async fn ping(&self, seq_cnt: u16) -> Result<(IcmpReply, Duration)> {
         let sender = self.socket.clone();
         let mut packet = EchoRequest::new(self.host, self.ident, seq_cnt, self.size).encode()?;
         let sock_addr = SocketAddr::new(self.host, 0);

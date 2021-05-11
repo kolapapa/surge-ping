@@ -3,7 +3,7 @@
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/kolapapa/surge-ping/blob/main/LICENSE)
 [![API docs](https://docs.rs/surge-ping/badge.svg)](http://docs.rs/surge-ping)
 
-rust ping libray based on `tokio` + `socket2` + `pnet_packet`.
+rust `ping`/`traceroute` libray based on `tokio` + `socket2` + `pnet_packet`.
 
 ### Example
 ```rust
@@ -18,7 +18,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     for seq_cnt in 0..10 {
         let (reply, dur) = pinger.ping(seq_cnt).await?;
         println!(
-            "{} bytes from {}: icmp_seq={} ttl={:?} time={:?}",
+            "{} bytes from {}: icmp_seq={} ttl={} time={:?}",
             reply.size, reply.source, reply.sequence, reply.ttl, dur
         );
     }
@@ -33,6 +33,7 @@ pinger.bind_device(Some("eth0".as_bytes()))?;
 ```
 
 
+### Ping
 There are two example programs that you can run on your own.
 ```shell
 $ git clone https://github.com/kolapapa/surge-ping.git
@@ -41,7 +42,7 @@ $ cd surge-ping
 
 $ cargo build --example simple
 sudo RUST_LOG=info ./target/debug/examples/simple -h www.baidu.com -s 56
-INFO  simple > Ok((EchoReply { ttl: Some(48), source: 220.181.38.148, sequence: 0, identifier: 111, size: 64 }, 7.4106ms))
+INFO  simple > Ok((EchoReply { ttl: 48, source: 220.181.38.148, sequence: 0, identifier: 111, size: 64 }, 7.4106ms))
 
 $ cargo build --example cmd
 sudo ./target/debug/examples/cmd -h www.baidu.com -c 5
@@ -56,6 +57,32 @@ PING www.baidu.com (220.181.38.149): 56 data bytes
 5 packets transmitted, 5 packets received, 0.00% packet loss
 round-trip min/avg/max/stddev = 8.902/11.951/15.662/2.868 ms
 ```
+
+### Traceroute
+Here is an example of the use of traceroute.
+```shell
+$ cargo build --example traceroute
+sudo RUST_LOG=info ./target/debug/examples/traceroute -h 114.114.114.114 -m 30 -i 1
+traceroute to 114.114.114.114 (114.114.114.114), 30 hops max, 56 byte packets
+1 10.1.39.254 (10.1.39.254) 49ms 61ms 57ms
+2 10.100.0.6 (10.100.0.6) 28ms 40ms 59ms
+3 * * *
+4 * * *
+5 * * *
+6 * * *
+7 * * *
+8 * * *
+9 * * *
+10 * * *
+11 * * *
+12 * * *
+13 * * *
+14 * * *
+15 * * *
+16 * * *
+17 114.114.114.114 (114.114.114.114) 42ms 39ms 79ms
+```
+
 
 # Notice
 If you are **time sensitive**, please do not use `asynchronous ping program`, because if there are a large number of asynchronous events waiting to wake up, it will cause inaccurate calculation time. You can directly use the `ping command` of the operating system.
