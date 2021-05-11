@@ -62,7 +62,7 @@ round-trip min/avg/max/stddev = 8.902/11.951/15.662/2.868 ms
 Here is an example of the use of traceroute.
 ```shell
 $ cargo build --example traceroute
-sudo RUST_LOG=info ./target/debug/examples/traceroute -h 114.114.114.114 -m 30 -i 1
+sudo ./target/debug/examples/traceroute -h 114.114.114.114 -m 30 -i 1
 traceroute to 114.114.114.114 (114.114.114.114), 30 hops max, 56 byte packets
 1 10.1.39.254 (10.1.39.254) 49ms 61ms 57ms
 2 10.100.0.6 (10.100.0.6) 28ms 40ms 59ms
