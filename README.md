@@ -33,6 +33,7 @@ pinger.bind_device(Some("eth0".as_bytes()))?;
 ```
 
 
+### Ping(ICMP)
 There are two example programs that you can run on your own.
 ```shell
 $ git clone https://github.com/kolapapa/surge-ping.git
@@ -56,6 +57,9 @@ PING www.baidu.com (220.181.38.149): 56 data bytes
 5 packets transmitted, 5 packets received, 0.00% packet loss
 round-trip min/avg/max/stddev = 8.902/11.951/15.662/2.868 ms
 ```
+
+### Traceroute(ICMP)
+At present, a sample version of `Traceroute` is implemented(only IPv4 is supported), which can be viewed through the branch of [traceroute](https://github.com/kolapapa/surge-ping/tree/traceroute)
 
 # Notice
 If you are **time sensitive**, please do not use `asynchronous ping program`, because if there are a large number of asynchronous events waiting to wake up, it will cause inaccurate calculation time. You can directly use the `ping command` of the operating system.
