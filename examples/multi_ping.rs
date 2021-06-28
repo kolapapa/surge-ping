@@ -1,7 +1,7 @@
 use std::net::IpAddr;
 use std::time::Duration;
 
-use surge_ping::Pinger;
+use surge_ping::{IcmpPacket, Pinger};
 use tokio::signal;
 use tokio::time;
 
@@ -12,6 +12,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "8.8.8.8",
         "39.156.69.79",
         "172.217.26.142",
+        "240c::6666",
     ];
     for ip in &ips {
         let addr: IpAddr = ip.parse()?;
@@ -31,16 +32,13 @@ async fn ping(addr: IpAddr, size: usize) -> Result<(), Box<dyn std::error::Error
     for idx in 0..5 {
         interval.tick().await;
         match pinger.ping(idx).await {
-            Ok((reply, dur)) => println!(
+            Ok((IcmpPacket::V4(packet), dur)) => println!(
                 "{} bytes from {}: icmp_seq={} ttl={} time={:?}",
-                reply.size,
-                reply.source,
-                reply.sequence,
-                match reply.ttl {
-                    Some(ttl) => format!("{}", ttl),
-                    None => "?".to_string(),
-                },
-                dur
+                packet.size, packet.source, packet.sequence, packet.ttl, dur
+            ),
+            Ok((IcmpPacket::V6(packet), dur)) => println!(
+                "{} bytes from {}: icmp_seq={} hlim={} time={:?}",
+                packet.size, packet.source, packet.sequence, packet.max_hop_limit, dur
             ),
             Err(e) => println!("{} ping {}", addr, e),
         };

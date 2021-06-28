@@ -12,7 +12,7 @@ use tokio::task;
 use tokio::time::sleep;
 
 use crate::error::{Result, SurgeError};
-use crate::icmp::{EchoReply, EchoRequest};
+use crate::icmp::{icmpv4, icmpv6, IcmpPacket};
 use crate::unix::AsyncSocket;
 
 type Token = (u16, u16);
@@ -110,35 +110,37 @@ impl Pinger {
         self
     }
 
-    async fn recv_reply(&self, seq_cnt: u16) -> Result<(EchoReply, Duration)> {
+    async fn recv_reply(&self, seq_cnt: u16) -> Result<(IcmpPacket, Duration)> {
         let mut buffer = [MaybeUninit::new(0); 2048];
         loop {
             let size = self.socket.recv(&mut buffer).await?;
             let buf = unsafe { assume_init(&buffer[..size]) };
-            match EchoReply::decode(self.host, buf) {
-                Ok(reply) => {
-                    // check reply ident is same
-                    if reply.identifier == self.ident && reply.sequence == seq_cnt {
+            let packet = match self.host {
+                IpAddr::V4(_) => icmpv4::Icmpv4Packet::decode(buf).map(IcmpPacket::V4),
+                IpAddr::V6(_) => icmpv6::Icmpv6Packet::decode(buf).map(IcmpPacket::V6),
+            };
+            match packet {
+                Ok(packet) => {
+                    if packet.check_reply_packet(self.host, seq_cnt, self.ident) {
                         if let Some(ins) = self.cache.remove(self.ident, seq_cnt) {
-                            return Ok((reply, Instant::now() - ins));
+                            return Ok((packet, Instant::now() - ins));
                         }
                     }
-                    continue;
                 }
-                Err(SurgeError::NotEchoReply(_)) => continue,
-                Err(SurgeError::NotV6EchoReply(_)) => continue,
-                Err(SurgeError::OtherICMP) => continue,
-                Err(e) => {
-                    return Err(e);
-                }
+                Err(SurgeError::MalformedPacket(_)) => continue,
+                Err(e) => return Err(e),
             }
         }
     }
 
     /// Send Ping request with sequence number.
-    pub async fn ping(&self, seq_cnt: u16) -> Result<(EchoReply, Duration)> {
+    pub async fn ping(&self, seq_cnt: u16) -> Result<(IcmpPacket, Duration)> {
         let sender = self.socket.clone();
-        let mut packet = EchoRequest::new(self.host, self.ident, seq_cnt, self.size).encode()?;
+        let mut packet = match self.host {
+            IpAddr::V4(_) => icmpv4::make_icmpv4_echo_packet(self.ident, seq_cnt, self.size)?,
+            IpAddr::V6(_) => icmpv6::make_icmpv6_echo_packet(self.ident, seq_cnt, self.size)?,
+        };
+        // let mut packet = EchoRequest::new(self.host, self.ident, seq_cnt, self.size).encode()?;
         let sock_addr = SocketAddr::new(self.host, 0);
         let ident = self.ident;
         let cache = self.cache.clone();

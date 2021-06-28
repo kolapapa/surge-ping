@@ -22,7 +22,7 @@ pub enum SurgeError {
     NotV6EchoReply(Icmpv6Type),
     #[error("timeout error")]
     Timeout,
-    #[error("other icmp message")]
+    #[error("other IcmpPacket")]
     OtherICMP,
 }
 
@@ -30,8 +30,10 @@ pub enum SurgeError {
 pub enum MalformedPacketError {
     #[error("expected an Ipv4Packet")]
     NotIpv4Packet,
-    #[error("expected an IcmpPacket payload")]
-    NotIcmpPacket,
+    #[error("expected an Ipv6Packet")]
+    NotIpv6Packet,
+    #[error("expected an Icmpv4Packet payload")]
+    NotIcmpv4Packet,
     #[error("expected an Icmpv6Packet")]
     NotIcmpv6Packet,
     #[error("payload too short, got {got}, want {want}")]
