@@ -121,6 +121,7 @@ impl Pinger {
         let mut buffer = [MaybeUninit::new(0); 2048];
         loop {
             let size = self.socket.recv(&mut buffer).await?;
+            let curr = Instant::now();
             let buf = unsafe { assume_init(&buffer[..size]) };
             let packet = match self.host {
                 IpAddr::V4(_) => icmpv4::Icmpv4Packet::decode(buf).map(IcmpPacket::V4),
@@ -130,7 +131,7 @@ impl Pinger {
                 Ok(packet) => {
                     if packet.check_reply_packet(self.host, seq_cnt, self.ident) {
                         if let Some(ins) = self.cache.remove(self.ident, seq_cnt) {
-                            return Ok((packet, Instant::now() - ins));
+                            return Ok((packet, curr - ins));
                         }
                     }
                 }
