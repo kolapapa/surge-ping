@@ -1,7 +1,6 @@
 #![allow(dead_code)]
 use std::io;
 
-use pnet_packet::{icmp::IcmpType, icmpv6::Icmpv6Type};
 use thiserror::Error;
 
 pub type Result<T> = std::result::Result<T, SurgeError>;
@@ -16,14 +15,8 @@ pub enum SurgeError {
     MalformedPacket(#[from] MalformedPacketError),
     #[error("io error")]
     IOError(#[from] io::Error),
-    #[error("expected echoreply, got {0:?}")]
-    NotEchoReply(IcmpType),
-    #[error("expected echoreply, got {0:?}")]
-    NotV6EchoReply(Icmpv6Type),
-    #[error("timeout error")]
-    Timeout,
-    #[error("other IcmpPacket")]
-    OtherICMP,
+    #[error("Request timeout for icmp_seq {seq}")]
+    Timeout { seq: u16 },
 }
 
 #[derive(Error, Debug)]

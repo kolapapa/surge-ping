@@ -134,7 +134,6 @@ impl Pinger {
                         }
                     }
                 }
-                Err(SurgeError::MalformedPacket(_)) => continue,
                 Err(e) => return Err(e),
             }
         }
@@ -166,7 +165,7 @@ impl Pinger {
             }),
             Err(_) => {
                 self.cache.remove(ident, seq_cnt);
-                Err(SurgeError::Timeout)
+                Err(SurgeError::Timeout { seq: seq_cnt })
             }
         }
     }
