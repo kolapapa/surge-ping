@@ -92,6 +92,13 @@ impl Pinger {
         Ok(self)
     }
 
+    /// Set the value of the IP_TTL option for this socket.
+    /// This value sets the time-to-live field that is used in every packet sent from this socket.
+    pub fn set_ttl(&mut self, ttl: u32) -> Result<&mut Pinger> {
+        self.socket.set_ttl(ttl)?;
+        Ok(self)
+    }
+
     /// Set the identification of ICMP.
     pub fn ident(&mut self, val: u16) -> &mut Pinger {
         self.ident = val;

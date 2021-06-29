@@ -27,9 +27,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ```
 
-You can send ICMP packets with custom interface
+You can send ICMP packets with custom interface or `set_ttl`
 ```rust
 pinger.bind_device(Some("eth0".as_bytes()))?;
+
+pinger.set_ttl(20)?;
 ```
 
 
@@ -42,24 +44,21 @@ $ cd surge-ping
 
 $ cargo build --example simple
 sudo RUST_LOG=info ./target/debug/examples/simple -h www.baidu.com -s 56
-INFO  simple > Ok((EchoReply { ttl: Some(48), source: 220.181.38.148, sequence: 0, identifier: 111, size: 64 }, 7.4106ms))
+INFO  simple > Ok((Icmpv4(Icmpv4Packet { source: 110.242.68.4, destination: 10.1.33.227, ttl: 45, icmp_type: IcmpType(0), icmp_code: IcmpCode(0), size: 64, identifier: 111, sequence: 0 }), 14.687909ms))
 
 $ cargo build --example cmd
 sudo ./target/debug/examples/cmd -h www.baidu.com -c 5
-PING www.baidu.com (220.181.38.149): 56 data bytes
-64 bytes from 220.181.38.149: icmp_seq=0 ttl=45 time=8.987 ms
-64 bytes from 220.181.38.149: icmp_seq=1 ttl=45 time=15.662 ms
-64 bytes from 220.181.38.149: icmp_seq=2 ttl=45 time=14.924 ms
-64 bytes from 220.181.38.149: icmp_seq=3 ttl=45 time=8.902 ms
-64 bytes from 220.181.38.149: icmp_seq=4 ttl=45 time=11.281 ms
+PING www.baidu.com (110.242.68.4): 56 data bytes
+64 bytes from 110.242.68.4: icmp_seq=0 ttl=45 time=12.721 ms
+64 bytes from 110.242.68.4: icmp_seq=1 ttl=45 time=15.458 ms
+64 bytes from 110.242.68.4: icmp_seq=2 ttl=45 time=21.048 ms
+64 bytes from 110.242.68.4: icmp_seq=3 ttl=45 time=18.368 ms
+64 bytes from 110.242.68.4: icmp_seq=4 ttl=45 time=19.718 ms
 
 --- www.baidu.com ping statistics ---
 5 packets transmitted, 5 packets received, 0.00% packet loss
-round-trip min/avg/max/stddev = 8.902/11.951/15.662/2.868 ms
+round-trip min/avg/max/stddev = 12.721/17.463/21.048/3.009 ms
 ```
-
-### Traceroute(ICMP)
-At present, a sample version of `Traceroute` is implemented(only IPv4 is supported), which can be viewed through the branch of [traceroute](https://github.com/kolapapa/surge-ping/tree/traceroute)
 
 # Notice
 If you are **time sensitive**, please do not use `asynchronous ping program`, because if there are a large number of asynchronous events waiting to wake up, it will cause inaccurate calculation time. You can directly use the `ping command` of the operating system.
