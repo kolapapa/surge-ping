@@ -33,6 +33,7 @@ pub struct Icmpv4Packet {
     icmp_type: IcmpType,
     icmp_code: IcmpCode,
     size: usize,
+    real_dest: Ipv4Addr,
     identifier: u16,
     sequence: u16,
 }
@@ -46,6 +47,7 @@ impl Default for Icmpv4Packet {
             icmp_type: IcmpType::new(0),
             icmp_code: IcmpCode::new(0),
             size: 0,
+            real_dest: Ipv4Addr::new(127, 0, 0, 1),
             identifier: 0,
             sequence: 0,
         }
@@ -113,6 +115,17 @@ impl Icmpv4Packet {
         self.size
     }
 
+    fn real_dest(&mut self, addr: Ipv4Addr) -> &mut Self {
+        self.real_dest = addr;
+        self
+    }
+
+    /// If it is an `echo_reply` packet, it is the source address in the IPv4 packet.
+    /// If it is other packets, it is the destination address in the IPv4 packet in ICMP's payload.
+    pub fn get_real_dest(&self) -> Ipv4Addr {
+        self.real_dest
+    }
+
     fn identifier(&mut self, identifier: u16) -> &mut Self {
         self.identifier = identifier;
         self
@@ -152,15 +165,18 @@ impl Icmpv4Packet {
                     .icmp_type(icmp_packet.get_icmp_type())
                     .icmp_code(icmp_packet.get_icmp_code())
                     .size(icmp_packet.packet().len())
+                    .real_dest(ipv4_packet.get_source())
                     .identifier(icmp_packet.get_identifier())
                     .sequence(icmp_packet.get_sequence_number());
                 Ok(packet)
             }
             _ => {
                 let icmp_payload = icmp_packet.payload();
-                // ip header(20) + echo icmp(4)
-                let identifier = u16::from_be_bytes(icmp_payload[24..26].try_into().unwrap());
-                let sequence = u16::from_be_bytes(icmp_payload[26..28].try_into().unwrap());
+                // icmp unused(4) + ip header(20) + echo icmp(4)
+                let real_ip_packet = ipv4::Ipv4Packet::new(&icmp_payload[4..])
+                    .ok_or_else(|| SurgeError::from(MalformedPacketError::NotIpv4Packet))?;
+                let identifier = u16::from_be_bytes(icmp_payload[28..30].try_into().unwrap());
+                let sequence = u16::from_be_bytes(icmp_payload[30..32].try_into().unwrap());
                 let mut packet = Icmpv4Packet::default();
                 packet
                     .source(ipv4_packet.get_source())
@@ -169,6 +185,7 @@ impl Icmpv4Packet {
                     .icmp_type(icmp_packet.get_icmp_type())
                     .icmp_code(icmp_packet.get_icmp_code())
                     .size(icmp_packet.packet_size())
+                    .real_dest(real_ip_packet.get_destination())
                     .identifier(identifier)
                     .sequence(sequence);
                 Ok(packet)

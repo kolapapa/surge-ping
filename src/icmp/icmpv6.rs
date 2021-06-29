@@ -34,6 +34,7 @@ pub struct Icmpv6Packet {
     icmpv6_type: Icmpv6Type,
     icmpv6_code: Icmpv6Code,
     size: usize,
+    real_dest: Ipv6Addr,
     identifier: u16,
     sequence: u16,
 }
@@ -47,6 +48,7 @@ impl Default for Icmpv6Packet {
             icmpv6_type: Icmpv6Type::new(0),
             icmpv6_code: Icmpv6Code::new(0),
             size: 0,
+            real_dest: Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1),
             identifier: 0,
             sequence: 0,
         }
@@ -114,6 +116,17 @@ impl Icmpv6Packet {
         self.size
     }
 
+    fn real_dest(&mut self, addr: Ipv6Addr) -> &mut Self {
+        self.real_dest = addr;
+        self
+    }
+
+    /// If it is an `echo_reply` packet, it is the source address in the IPv6 packet.
+    /// If it is other packets, it is the destination address in the IPv6 packet in ICMPv6's payload.
+    pub fn get_real_dest(&self) -> Ipv6Addr {
+        self.real_dest
+    }
+
     fn identifier(&mut self, identifier: u16) -> &mut Self {
         self.identifier = identifier;
         self
@@ -154,6 +167,7 @@ impl Icmpv6Packet {
                     .icmpv6_type(icmpv6_packet.get_icmpv6_type())
                     .icmpv6_code(icmpv6_packet.get_icmpv6_code())
                     .size(icmpv6_packet.packet_size())
+                    .real_dest(ipv6_packet.get_source())
                     .identifier(identifier)
                     .sequence(sequence);
                 Ok(packet)
