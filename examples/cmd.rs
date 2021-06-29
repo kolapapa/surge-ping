@@ -153,10 +153,10 @@ async fn main() {
             Ok((IcmpPacket::V4(reply), dur)) => {
                 println!(
                     "{} bytes from {}: icmp_seq={} ttl={} time={:.3} ms",
-                    reply.size,
-                    reply.source,
-                    reply.sequence,
-                    reply.ttl,
+                    reply.get_size(),
+                    reply.get_source(),
+                    reply.get_sequence(),
+                    reply.get_ttl(),
                     dur.as_secs_f64() * 1000f64
                 );
                 answer.update(Some(dur));
@@ -164,10 +164,10 @@ async fn main() {
             Ok((IcmpPacket::V6(reply), dur)) => {
                 println!(
                     "{} bytes from {}: icmp_seq={} hlim={} time={:.3} ms",
-                    reply.size,
-                    reply.source,
-                    reply.sequence,
-                    reply.max_hop_limit,
+                    reply.get_size(),
+                    reply.get_source(),
+                    reply.get_sequence(),
+                    reply.get_max_hop_limit(),
                     dur.as_secs_f64() * 1000f64
                 );
                 answer.update(Some(dur));

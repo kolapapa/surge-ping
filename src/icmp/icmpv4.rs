@@ -24,41 +24,116 @@ pub fn make_icmpv4_echo_packet(ident: u16, seq_cnt: u16, size: usize) -> Result<
     Ok(packet.packet().to_vec())
 }
 
+/// Packet structure returned by ICMPv4.
 #[derive(Debug)]
 pub struct Icmpv4Packet {
-    pub source: Ipv4Addr,
-    pub destination: Ipv4Addr,
-    pub ttl: u8,
-    pub icmp_type: IcmpType,
-    pub icmp_code: IcmpCode,
-    pub size: usize,
-    pub identifier: u16,
-    pub sequence: u16,
+    source: Ipv4Addr,
+    destination: Ipv4Addr,
+    ttl: u8,
+    icmp_type: IcmpType,
+    icmp_code: IcmpCode,
+    size: usize,
+    identifier: u16,
+    sequence: u16,
+}
+
+impl Default for Icmpv4Packet {
+    fn default() -> Self {
+        Icmpv4Packet {
+            source: Ipv4Addr::new(127, 0, 0, 1),
+            destination: Ipv4Addr::new(127, 0, 0, 1),
+            ttl: 0,
+            icmp_type: IcmpType::new(0),
+            icmp_code: IcmpCode::new(0),
+            size: 0,
+            identifier: 0,
+            sequence: 0,
+        }
+    }
 }
 
 impl Icmpv4Packet {
-    fn new(
-        source: Ipv4Addr,
-        destination: Ipv4Addr,
-        ttl: u8,
-        icmp_type: IcmpType,
-        icmp_code: IcmpCode,
-        size: usize,
-        identifier: u16,
-        sequence: u16,
-    ) -> Self {
-        Icmpv4Packet {
-            source,
-            destination,
-            ttl,
-            icmp_type,
-            icmp_code,
-            size,
-            identifier,
-            sequence,
-        }
+    fn source(&mut self, source: Ipv4Addr) -> &mut Self {
+        self.source = source;
+        self
     }
 
+    /// Get the source field.
+    pub fn get_source(&self) -> Ipv4Addr {
+        self.source
+    }
+
+    fn destination(&mut self, destination: Ipv4Addr) -> &mut Self {
+        self.destination = destination;
+        self
+    }
+
+    /// Get the destination field.
+    pub fn get_destination(&self) -> Ipv4Addr {
+        self.destination
+    }
+
+    fn ttl(&mut self, ttl: u8) -> &mut Self {
+        self.ttl = ttl;
+        self
+    }
+
+    /// Get the ttl field.
+    pub fn get_ttl(&self) -> u8 {
+        self.ttl
+    }
+
+    fn icmp_type(&mut self, icmp_type: IcmpType) -> &mut Self {
+        self.icmp_type = icmp_type;
+        self
+    }
+
+    /// Get the icmp_type of the icmpv4 packet.
+    pub fn get_icmp_type(&self) -> IcmpType {
+        self.icmp_type
+    }
+
+    fn icmp_code(&mut self, icmp_code: IcmpCode) -> &mut Self {
+        self.icmp_code = icmp_code;
+        self
+    }
+
+    /// Get the icmp_code of the icmpv4 packet.
+    pub fn get_icmp_code(&self) -> IcmpCode {
+        self.icmp_code
+    }
+
+    fn size(&mut self, size: usize) -> &mut Self {
+        self.size = size;
+        self
+    }
+
+    /// Get the size of the icmp_v4 packet.
+    pub fn get_size(&self) -> usize {
+        self.size
+    }
+
+    fn identifier(&mut self, identifier: u16) -> &mut Self {
+        self.identifier = identifier;
+        self
+    }
+
+    /// Get the identifier of the icmp_v4 packet.
+    pub fn get_identifier(&self) -> u16 {
+        self.identifier
+    }
+
+    fn sequence(&mut self, sequence: u16) -> &mut Self {
+        self.sequence = sequence;
+        self
+    }
+
+    /// Get the sequence of the icmp_v4 packet.
+    pub fn get_sequence(&self) -> u16 {
+        self.sequence
+    }
+
+    /// Decode into icmp packet from the socket message.
     pub fn decode(buf: &[u8]) -> Result<Self> {
         let ipv4_packet = ipv4::Ipv4Packet::new(buf)
             .ok_or_else(|| SurgeError::from(MalformedPacketError::NotIpv4Packet))?;
@@ -69,32 +144,34 @@ impl Icmpv4Packet {
             icmp::IcmpTypes::EchoReply => {
                 let icmp_packet = icmp::echo_reply::EchoReplyPacket::new(payload)
                     .ok_or_else(|| SurgeError::from(MalformedPacketError::NotIcmpv4Packet))?;
-                Ok(Icmpv4Packet::new(
-                    ipv4_packet.get_source(),
-                    ipv4_packet.get_destination(),
-                    ipv4_packet.get_ttl(),
-                    icmp_packet.get_icmp_type(),
-                    icmp_packet.get_icmp_code(),
-                    icmp_packet.packet().len(),
-                    icmp_packet.get_identifier(),
-                    icmp_packet.get_sequence_number(),
-                ))
+                let mut packet = Icmpv4Packet::default();
+                packet
+                    .source(ipv4_packet.get_source())
+                    .destination(ipv4_packet.get_destination())
+                    .ttl(ipv4_packet.get_ttl())
+                    .icmp_type(icmp_packet.get_icmp_type())
+                    .icmp_code(icmp_packet.get_icmp_code())
+                    .size(icmp_packet.packet().len())
+                    .identifier(icmp_packet.get_identifier())
+                    .sequence(icmp_packet.get_sequence_number());
+                Ok(packet)
             }
             _ => {
                 let icmp_payload = icmp_packet.payload();
                 // ip header(20) + echo icmp(4)
                 let identifier = u16::from_be_bytes(icmp_payload[24..26].try_into().unwrap());
                 let sequence = u16::from_be_bytes(icmp_payload[26..28].try_into().unwrap());
-                Ok(Icmpv4Packet::new(
-                    ipv4_packet.get_source(),
-                    ipv4_packet.get_destination(),
-                    ipv4_packet.get_ttl(),
-                    icmp_packet.get_icmp_type(),
-                    icmp_packet.get_icmp_code(),
-                    icmp_packet.packet_size(),
-                    identifier,
-                    sequence,
-                ))
+                let mut packet = Icmpv4Packet::default();
+                packet
+                    .source(ipv4_packet.get_source())
+                    .destination(ipv4_packet.get_destination())
+                    .ttl(ipv4_packet.get_ttl())
+                    .icmp_type(icmp_packet.get_icmp_type())
+                    .icmp_code(icmp_packet.get_icmp_code())
+                    .size(icmp_packet.packet_size())
+                    .identifier(identifier)
+                    .sequence(sequence);
+                Ok(packet)
             }
         }
     }

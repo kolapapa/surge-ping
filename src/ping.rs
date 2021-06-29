@@ -9,7 +9,7 @@ use std::{
 use parking_lot::Mutex;
 use rand::random;
 use tokio::task;
-use tokio::time::sleep;
+use tokio::time::timeout;
 
 use crate::error::{Result, SurgeError};
 use crate::icmp::{icmpv4, icmpv6, IcmpPacket};
@@ -152,17 +152,15 @@ impl Pinger {
             cache.insert(ident, seq_cnt, Instant::now());
         });
 
-        tokio::select! {
-            reply = self.recv_reply(seq_cnt) => {
-                reply.map_err(|err| {
-                    self.cache.remove(ident, seq_cnt);
-                    err
-                })
-            },
-            _ = sleep(self.timeout) => {
+        match timeout(self.timeout, self.recv_reply(seq_cnt)).await {
+            Ok(reply) => reply.map_err(|err| {
+                self.cache.remove(ident, seq_cnt);
+                err
+            }),
+            Err(_) => {
                 self.cache.remove(ident, seq_cnt);
                 Err(SurgeError::Timeout)
-            },
+            }
         }
     }
 }

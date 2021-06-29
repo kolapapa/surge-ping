@@ -34,11 +34,19 @@ async fn ping(addr: IpAddr, size: usize) -> Result<(), Box<dyn std::error::Error
         match pinger.ping(idx).await {
             Ok((IcmpPacket::V4(packet), dur)) => println!(
                 "{} bytes from {}: icmp_seq={} ttl={} time={:?}",
-                packet.size, packet.source, packet.sequence, packet.ttl, dur
+                packet.get_size(),
+                packet.get_source(),
+                packet.get_sequence(),
+                packet.get_ttl(),
+                dur
             ),
             Ok((IcmpPacket::V6(packet), dur)) => println!(
                 "{} bytes from {}: icmp_seq={} hlim={} time={:?}",
-                packet.size, packet.source, packet.sequence, packet.max_hop_limit, dur
+                packet.get_size(),
+                packet.get_source(),
+                packet.get_sequence(),
+                packet.get_max_hop_limit(),
+                dur
             ),
             Err(e) => println!("{} ping {}", addr, e),
         };
