@@ -3,7 +3,7 @@ use std::net::Ipv6Addr;
 
 use pnet_packet::icmpv6::{self, Icmpv6Code, Icmpv6Type};
 use pnet_packet::Packet;
-use pnet_packet::{ipv6, PacketSize};
+use pnet_packet::PacketSize;
 
 use crate::error::{MalformedPacketError, Result, SurgeError};
 
@@ -42,13 +42,13 @@ pub struct Icmpv6Packet {
 impl Default for Icmpv6Packet {
     fn default() -> Self {
         Icmpv6Packet {
-            source: Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1),
-            destination: Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1),
+            source: Ipv6Addr::LOCALHOST,
+            destination: Ipv6Addr::LOCALHOST,
             max_hop_limit: 0,
             icmpv6_type: Icmpv6Type::new(0),
             icmpv6_code: Icmpv6Code::new(0),
             size: 0,
-            real_dest: Ipv6Addr::new(0, 0, 0, 0, 0, 0, 0, 1),
+            real_dest: Ipv6Addr::LOCALHOST,
             identifier: 0,
             sequence: 0,
         }
@@ -148,39 +148,45 @@ impl Icmpv6Packet {
     }
 
     /// Decode into icmpv6 packet from the socket message.
-    pub fn decode(buf: &[u8]) -> Result<Self> {
-        let ipv6_packet = ipv6::Ipv6Packet::new(buf)
-            .ok_or_else(|| SurgeError::from(MalformedPacketError::NotIpv4Packet))?;
-        let payload = ipv6_packet.payload();
-        let icmpv6_packet = icmpv6::Icmpv6Packet::new(payload)
+    pub fn decode(buf: &[u8], destination: Ipv6Addr) -> Result<Self> {
+        log::info!("{:?}", buf);
+        // let ipv6_packet = ipv6::Ipv6Packet::new(buf)
+        //     .ok_or_else(|| SurgeError::from(MalformedPacketError::NotIpv4Packet))?;
+        // let payload = ipv6_packet.payload();
+        let icmpv6_packet = icmpv6::Icmpv6Packet::new(buf)
             .ok_or_else(|| SurgeError::from(MalformedPacketError::NotIcmpv6Packet))?;
+        log::info!("{:?}", &icmpv6_packet);
+        log::info!("{:?}", &icmpv6_packet.get_icmpv6_type());
+        log::info!("{:?}", icmpv6::Icmpv6Types::EchoReply);
         let icmpv6_payload = icmpv6_packet.payload();
         match icmpv6_packet.get_icmpv6_type() {
+            icmpv6::Icmpv6Types::EchoRequest => Err(SurgeError::EchoRequestPacket),
             icmpv6::Icmpv6Types::EchoReply => {
                 let identifier = u16::from_be_bytes(icmpv6_payload[0..2].try_into().unwrap());
                 let sequence = u16::from_be_bytes(icmpv6_payload[2..4].try_into().unwrap());
                 let mut packet = Icmpv6Packet::default();
                 packet
-                    .source(ipv6_packet.get_source())
-                    .destination(ipv6_packet.get_destination())
-                    .max_hop_limit(ipv6_packet.get_hop_limit())
+                    .source(destination)
+                    .destination(Ipv6Addr::LOCALHOST)
+                    .max_hop_limit(0)
                     .icmpv6_type(icmpv6_packet.get_icmpv6_type())
                     .icmpv6_code(icmpv6_packet.get_icmpv6_code())
-                    .size(icmpv6_packet.packet_size())
-                    .real_dest(ipv6_packet.get_source())
+                    .size(icmpv6_packet.packet().len())
+                    .real_dest(destination)
                     .identifier(identifier)
                     .sequence(sequence);
                 Ok(packet)
             }
             _ => {
                 // ipv6 header(40) + icmpv6 echo header(4)
-                let identifier = u16::from_be_bytes(payload[44..46].try_into().unwrap());
-                let sequence = u16::from_be_bytes(payload[46..48].try_into().unwrap());
+                log::info!("{:?}", icmpv6_payload);
+                let identifier = u16::from_be_bytes(icmpv6_payload[44..46].try_into().unwrap());
+                let sequence = u16::from_be_bytes(icmpv6_payload[46..48].try_into().unwrap());
                 let mut packet = Icmpv6Packet::default();
                 packet
-                    .source(ipv6_packet.get_source())
-                    .destination(ipv6_packet.get_destination())
-                    .max_hop_limit(ipv6_packet.get_hop_limit())
+                    .source(destination)
+                    .destination(destination)
+                    .max_hop_limit(0)
                     .icmpv6_type(icmpv6_packet.get_icmpv6_type())
                     .icmpv6_code(icmpv6_packet.get_icmpv6_code())
                     .size(icmpv6_packet.packet_size())

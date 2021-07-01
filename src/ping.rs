@@ -12,7 +12,7 @@ use tokio::task;
 use tokio::time::timeout;
 
 use crate::error::{Result, SurgeError};
-use crate::icmp::{icmpv4, icmpv6, IcmpPacket};
+use crate::icmp::{icmpv4, IcmpPacket};
 use crate::unix::AsyncSocket;
 
 type Token = (u16, u16);
@@ -56,9 +56,10 @@ impl Cache {
 ///
 #[derive(Debug, Clone)]
 pub struct Pinger {
-    host: IpAddr,
+    destination: IpAddr,
     ident: u16,
     size: usize,
+    ttl: u8,
     timeout: Duration,
     socket: AsyncSocket,
     cache: Cache,
@@ -68,9 +69,10 @@ impl Pinger {
     /// Creates a new Ping instance from `IpAddr`.
     pub fn new(host: IpAddr) -> Result<Pinger> {
         Ok(Pinger {
-            host,
+            destination: host,
             ident: random(),
             size: 56,
+            ttl: 60,
             timeout: Duration::from_secs(2),
             socket: AsyncSocket::new(host)?,
             cache: Cache::new(),
@@ -94,8 +96,8 @@ impl Pinger {
 
     /// Set the value of the IP_TTL option for this socket.
     /// This value sets the time-to-live field that is used in every packet sent from this socket.
-    pub fn set_ttl(&mut self, ttl: u32) -> Result<&mut Pinger> {
-        self.socket.set_ttl(ttl)?;
+    pub fn set_ttl(&mut self, ttl: u8) -> Result<&mut Pinger> {
+        self.socket.set_ttl(ttl as u32)?;
         Ok(self)
     }
 
@@ -123,18 +125,19 @@ impl Pinger {
             let size = self.socket.recv(&mut buffer).await?;
             let curr = Instant::now();
             let buf = unsafe { assume_init(&buffer[..size]) };
-            let packet = match self.host {
+            let packet = match self.destination {
                 IpAddr::V4(_) => icmpv4::Icmpv4Packet::decode(buf).map(IcmpPacket::V4),
-                IpAddr::V6(_) => icmpv6::Icmpv6Packet::decode(buf).map(IcmpPacket::V6),
+                IpAddr::V6(_) => todo!(),
             };
             match packet {
                 Ok(packet) => {
-                    if packet.check_reply_packet(self.host, seq_cnt, self.ident) {
+                    if packet.check_reply_packet(self.destination, seq_cnt, self.ident) {
                         if let Some(ins) = self.cache.remove(self.ident, seq_cnt) {
                             return Ok((packet, curr - ins));
                         }
                     }
                 }
+                Err(SurgeError::EchoRequestPacket) => continue,
                 Err(e) => return Err(e),
             }
         }
@@ -143,12 +146,12 @@ impl Pinger {
     /// Send Ping request with sequence number.
     pub async fn ping(&self, seq_cnt: u16) -> Result<(IcmpPacket, Duration)> {
         let sender = self.socket.clone();
-        let mut packet = match self.host {
+        let mut packet = match self.destination {
             IpAddr::V4(_) => icmpv4::make_icmpv4_echo_packet(self.ident, seq_cnt, self.size)?,
-            IpAddr::V6(_) => icmpv6::make_icmpv6_echo_packet(self.ident, seq_cnt, self.size)?,
+            IpAddr::V6(_) => todo!(),
         };
         // let mut packet = EchoRequest::new(self.host, self.ident, seq_cnt, self.size).encode()?;
-        let sock_addr = SocketAddr::new(self.host, 0);
+        let sock_addr = SocketAddr::new(self.destination, 0);
         let ident = self.ident;
         let cache = self.cache.clone();
         task::spawn(async move {

@@ -17,6 +17,10 @@ pub enum SurgeError {
     IOError(#[from] io::Error),
     #[error("Request timeout for icmp_seq {seq}")]
     Timeout { seq: u16 },
+    #[error("Echo Request packet.")]
+    EchoRequestPacket,
+    #[error("Network error.")]
+    NetworkError,
 }
 
 #[derive(Error, Debug)]

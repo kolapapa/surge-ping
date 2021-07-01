@@ -170,6 +170,7 @@ impl Icmpv4Packet {
                     .sequence(icmp_packet.get_sequence_number());
                 Ok(packet)
             }
+            icmp::IcmpTypes::EchoRequest => Err(SurgeError::EchoRequestPacket),
             _ => {
                 let icmp_payload = icmp_packet.payload();
                 // icmp unused(4) + ip header(20) + echo icmp(4)

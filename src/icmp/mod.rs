@@ -21,9 +21,7 @@ impl IcmpPacket {
                     && packet.get_sequence() == seq_cnt
                     && packet.get_identifier() == identifier
             }
-            IcmpPacket::V6(_) => {
-                todo!();
-            }
+            IcmpPacket::V6(_) => todo!(),
         }
     }
 }

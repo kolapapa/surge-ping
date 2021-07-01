@@ -53,8 +53,8 @@ async fn main() {
     pinger
         .ident(111)
         .size(opt.size)
-        .set_ttl(1)
-        .unwrap()
+        // .set_ttl(1)
+        // .unwrap()
         .timeout(Duration::from_secs(1));
     let answer = pinger.ping(0).await;
     info!("{:?}", answer);

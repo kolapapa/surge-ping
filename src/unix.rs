@@ -24,7 +24,6 @@ impl AsyncSocket {
         // TODO: Get access to the hop limits
         // https://tools.ietf.org/html/rfc3542#section-4, to show the TTL for
         // ICMPv6.
-
         socket.set_nonblocking(true)?;
         Ok(AsyncSocket {
             inner: Arc::new(AsyncFd::new(socket)?),
