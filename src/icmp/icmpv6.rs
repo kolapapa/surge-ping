@@ -7,6 +7,7 @@ use pnet_packet::PacketSize;
 
 use crate::error::{MalformedPacketError, Result, SurgeError};
 
+#[allow(dead_code)]
 pub fn make_icmpv6_echo_packet(ident: u16, seq_cnt: u16, size: usize) -> Result<Vec<u8>> {
     let mut buf = vec![0u8; 4 + 2 + 2 + size]; // 4 bytes ICMP header + 2 bytes ident + 2 bytes sequence, then payload
     let mut packet =

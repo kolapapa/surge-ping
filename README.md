@@ -5,6 +5,9 @@
 
 rust ping libray based on `tokio` + `socket2` + `pnet_packet`.
 
+Currently `IPv6` is not fully implemented. If you have a need for `IPv6`, you can submit a `PR` and build together~
+
+
 ### Example
 ```rust
 use std::time::Duration;
@@ -30,6 +33,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 You can send ICMP packets with custom interface or `set_ttl`
 ```rust
 pinger.bind_device(Some("eth0".as_bytes()))?;
+
+# You can rely on ttl to implement the icmp version of the traceroute program.
 
 pinger.set_ttl(20)?;
 ```

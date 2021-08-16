@@ -6,6 +6,7 @@ use std::{
     time::{Duration, Instant},
 };
 
+use log::trace;
 use parking_lot::Mutex;
 use rand::random;
 use tokio::task;
@@ -155,10 +156,9 @@ impl Pinger {
         let ident = self.ident;
         let cache = self.cache.clone();
         task::spawn(async move {
-            let _size = sender
-                .send_to(&mut packet, &sock_addr.into())
-                .await
-                .expect("socket send packet error");
+            if let Err(e) = sender.send_to(&mut packet, &sock_addr.into()).await {
+                trace!("send socket error: {}", e);
+            }
             cache.insert(ident, seq_cnt, Instant::now());
         });
 
