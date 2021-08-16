@@ -5,7 +5,9 @@
 
 rust ping libray based on `tokio` + `socket2` + `pnet_packet`.
 
-Currently `IPv6` is not fully implemented. If you have a need for `IPv6`, you can submit a `PR` and build together~
+### Care
+- `IPv6` is not fully implemented. If you have a need for `IPv6`, you can submit a `PR` and build together.
+- Does not support Windows, later support, welcome to submit PR.
 
 
 ### Example
