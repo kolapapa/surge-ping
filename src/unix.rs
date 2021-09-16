@@ -35,6 +35,10 @@ impl AsyncSocket {
         self.inner.get_ref().bind_device(interface)
     }
 
+    pub fn bind_addr(&self, sock_addr: &SockAddr) -> io::Result<()> {
+        self.inner.get_ref().bind(sock_addr)
+    }
+
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
         self.inner.get_ref().set_ttl(ttl)
     }
