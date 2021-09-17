@@ -95,6 +95,12 @@ impl Pinger {
         Ok(self)
     }
 
+    pub fn bind_addr(&mut self, addr: IpAddr) -> Result<&mut Pinger> {
+        let sock_addr = SocketAddr::new(addr, 0);
+        self.socket.bind_addr(&sock_addr.into())?;
+        Ok(self)
+    }
+
     /// Set the value of the IP_TTL option for this socket.
     /// This value sets the time-to-live field that is used in every packet sent from this socket.
     pub fn set_ttl(&mut self, ttl: u8) -> Result<&mut Pinger> {
