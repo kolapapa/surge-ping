@@ -95,6 +95,8 @@ impl Pinger {
         Ok(self)
     }
 
+    /// Binds this socket to the specified address.
+    /// This function directly corresponds to the bind(2) function on Windows and Unix.
     pub fn bind_addr(&mut self, addr: IpAddr) -> Result<&mut Pinger> {
         let sock_addr = SocketAddr::new(addr, 0);
         self.socket.bind_addr(&sock_addr.into())?;
