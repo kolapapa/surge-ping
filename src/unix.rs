@@ -1,6 +1,6 @@
+use std::io;
 use std::mem::MaybeUninit;
 use std::sync::Arc;
-use std::{io, net::IpAddr};
 
 use socket2::{Domain, Protocol, SockAddr, Socket, Type};
 use tokio::io::unix::AsyncFd;
@@ -11,10 +11,16 @@ pub struct AsyncSocket {
 }
 
 impl AsyncSocket {
-    pub fn new(addr: IpAddr) -> io::Result<AsyncSocket> {
-        let socket = match addr {
-            IpAddr::V4(_) => Socket::new(Domain::IPV4, Type::RAW, Some(Protocol::ICMPV4))?,
-            IpAddr::V6(_) => Socket::new(Domain::IPV6, Type::RAW, Some(Protocol::ICMPV6))?,
+    pub fn new(d: Domain) -> io::Result<AsyncSocket> {
+        let socket = match d {
+            Domain::IPV4 => Socket::new(Domain::IPV4, Type::RAW, Some(Protocol::ICMPV4))?,
+            Domain::IPV6 => Socket::new(Domain::IPV6, Type::RAW, Some(Protocol::ICMPV6))?,
+            _ => {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "Invalid domain",
+                ))
+            }
         };
 
         // TODO: Type filtering,
@@ -42,21 +48,20 @@ impl AsyncSocket {
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
         self.inner.get_ref().set_ttl(ttl)
     }
-
-    pub async fn recv(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<usize> {
+    pub async fn recv_from(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<(usize, SockAddr)> {
         loop {
             let mut guard = self.inner.readable().await?;
 
-            match guard.try_io(|inner| inner.get_ref().recv(buf)) {
+            match guard.try_io(|inner| inner.get_ref().recv_from(buf)) {
                 Ok(result) => return result,
                 Err(_would_block) => continue,
             }
         }
     }
-
     pub async fn send_to(&self, buf: &mut [u8], target: &SockAddr) -> io::Result<usize> {
+        let socket = self.inner.clone();
         loop {
-            let mut guard = self.inner.writable().await?;
+            let mut guard = socket.writable().await?;
 
             match guard.try_io(|inner| inner.get_ref().send_to(buf, target)) {
                 Ok(n) => return n,

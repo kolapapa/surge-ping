@@ -1,7 +1,8 @@
 use std::net::IpAddr;
 use std::time::Duration;
+use std::sync::Arc;
 
-use surge_ping::{IcmpPacket, Pinger};
+use surge_ping::{IcmpPacket, PingSocket};
 use tokio::signal;
 use tokio::time;
 
@@ -14,19 +15,25 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "172.217.26.142",
         "240c::6666",
     ];
+    let ping_socket_v4 = Arc::new(PingSocket::new(socket2::Domain::IPV4)?);
+    let mut tasks = Vec::new();
     for ip in &ips {
         let addr: IpAddr = ip.parse()?;
-        tokio::spawn(async move {
-            ping(addr, 56).await.unwrap();
-        });
+        let psc = ping_socket_v4.clone();
+        tasks.push(tokio::spawn(async move {
+            ping(psc, addr, 56).await.unwrap();
+        }));
     }
-    signal::ctrl_c().await?;
-    println!("ctrl-c received!");
+    for t in tasks.into_iter() {
+      t.await.unwrap();
+    }
+    //signal::ctrl_c().await?;
+    //println!("ctrl-c received!");
     Ok(())
 }
 // Ping an address 5 times， and print output message（interval 1s）
-async fn ping(addr: IpAddr, size: usize) -> Result<(), Box<dyn std::error::Error>> {
-    let mut pinger = Pinger::new(addr)?;
+async fn ping(ps:Arc<PingSocket>, addr: IpAddr, size: usize) -> Result<(), Box<dyn std::error::Error>> {
+    let mut pinger = ps.pinger(addr).await;
     pinger.size(size).timeout(Duration::from_secs(1));
     let mut interval = time::interval(Duration::from_secs(1));
     for idx in 0..5 {
