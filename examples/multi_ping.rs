@@ -14,12 +14,17 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "39.156.69.79",
         "172.217.26.142",
         "240c::6666",
+        "2a02:930::ff76"
     ];
     let ping_socket_v4 = Arc::new(PingSocket::new(socket2::Domain::IPV4)?);
+    let ping_socket_v6 = Arc::new(PingSocket::new(socket2::Domain::IPV6)?);
     let mut tasks = Vec::new();
     for ip in &ips {
         let addr: IpAddr = ip.parse()?;
-        let psc = ping_socket_v4.clone();
+        let psc = match addr {
+          IpAddr::V4(_) => ping_socket_v4.clone(),
+          IpAddr::V6(_) => ping_socket_v6.clone(),
+        };
         tasks.push(tokio::spawn(async move {
             ping(psc, addr, 56).await.unwrap();
         }));

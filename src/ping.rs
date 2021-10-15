@@ -15,7 +15,7 @@ use tokio::sync::mpsc::Receiver;
 
 
 use crate::error::{Result, SurgeError};
-use crate::icmp::{icmpv4, IcmpPacket};
+use crate::icmp::{icmpv4, IcmpPacket, icmpv6};
 use crate::unix::AsyncSocket;
 
 type Token = (u16, u16);
@@ -121,7 +121,7 @@ impl Pinger {
             let curr = Instant::now();
             let packet = match self.destination {
                 IpAddr::V4(_) => icmpv4::Icmpv4Packet::decode(&buf).map(IcmpPacket::V4),
-                IpAddr::V6(_) => todo!(),
+                IpAddr::V6(a) => icmpv6::Icmpv6Packet::decode(&buf, a).map(IcmpPacket::V6),
             };
             match packet {
                 Ok(packet) => {
@@ -142,7 +142,7 @@ impl Pinger {
         let sender = self.socket.clone();
         let mut packet = match self.destination {
             IpAddr::V4(_) => icmpv4::make_icmpv4_echo_packet(self.ident, seq_cnt, self.size)?,
-            IpAddr::V6(_) => todo!(),
+            IpAddr::V6(_) => icmpv6::make_icmpv6_echo_packet(self.ident, seq_cnt, self.size)?,
         };
         // let mut packet = EchoRequest::new(self.host, self.ident, seq_cnt, self.size).encode()?;
         let sock_addr = SocketAddr::new(self.destination, 0);

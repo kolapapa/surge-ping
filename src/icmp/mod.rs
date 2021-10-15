@@ -20,8 +20,10 @@ impl IcmpPacket {
                 destination.eq(&IpAddr::V4(packet.get_real_dest()))
                     && packet.get_sequence() == seq_cnt
                     && packet.get_identifier() == identifier
+            },
+            IcmpPacket::V6(packet) => {
+                packet.get_sequence() == seq_cnt  && packet.get_identifier() == identifier
             }
-            IcmpPacket::V6(_) => todo!(),
         }
     }
 }
