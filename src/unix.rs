@@ -48,6 +48,15 @@ impl AsyncSocket {
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
         self.inner.get_ref().set_ttl(ttl)
     }
+
+    pub fn set_send_buffer_size(&self, bufsize: usize) -> io::Result<()> {
+        self.inner.get_ref().set_send_buffer_size(bufsize)
+    }
+
+    pub fn set_recv_buffer_size(&self, bufsize: usize) -> io::Result<()> {
+        self.inner.get_ref().set_recv_buffer_size(bufsize)
+    }
+
     pub async fn recv_from(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<(usize, SockAddr)> {
         loop {
             let mut guard = self.inner.readable().await?;

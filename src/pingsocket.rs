@@ -106,18 +106,15 @@ impl PingSocket {
     pub fn set_ttl(&self, ttl: u32) -> io::Result<()> {
         self.inner.set_ttl(ttl)
     }
-    /*
-        pub async fn recv(&self, buf: &mut [MaybeUninit<u8>]) -> io::Result<usize> {
-            loop {
-                let mut guard = self.inner.readable().await?;
 
-                match guard.try_io(|inner| inner.get_ref().recv(buf)) {
-                    Ok(result) => return result,
-                    Err(_would_block) => continue,
-                }
-            }
-        }
-    */
+    pub fn set_send_buffer_size(&self, bufsize: usize) -> io::Result<()> {
+        self.inner.set_send_buffer_size(bufsize)
+    }
+
+    pub fn set_recv_buffer_size(&self, bufsize: usize) -> io::Result<()> {
+        self.inner.set_recv_buffer_size(bufsize)
+    }
+
     pub async fn send_to(
         socket: Arc<AsyncFd<Socket>>,
         buf: &mut [u8],
