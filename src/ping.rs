@@ -16,7 +16,7 @@ use tokio::sync::mpsc::Receiver;
 
 use crate::error::{Result, SurgeError};
 use crate::icmp::{icmpv4, IcmpPacket, icmpv6};
-use crate::unix::AsyncSocket;
+use crate::pingsocket::AsyncSocket;
 
 type Token = (u16, u16);
 
@@ -57,7 +57,6 @@ impl Cache {
 ///     println!("{:?}", result);
 /// }
 ///
-#[derive(Debug)]
 pub struct Pinger {
     destination: IpAddr,
     ident: u16,
@@ -71,7 +70,7 @@ pub struct Pinger {
 
 impl Pinger {
     /// Creates a new Ping instance from `IpAddr`.
-    #[deprecated(note="Use the pingsocket::PingSocket::pinger as Pinger constructor")]
+    #[deprecated(note="Use the pingsocket::PingSocketBuilder::run as Pinger constructor")]
     pub fn new(host: IpAddr) -> io::Result<Pinger> {
       crate::pingsocket::PingSocket::create_pinger(host)
     }
