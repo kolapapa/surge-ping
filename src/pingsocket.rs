@@ -45,6 +45,11 @@ impl PingSocketBuilder {
         self.socket.bind_device(interface)
     }
 
+    #[cfg(all(feature = "all", any(target_os = "freebsd")))]
+    pub fn set_fib(&self, fib:u32) -> io::Result<()> {
+        self.socket.set_fib(fib)
+    }
+
     pub fn bind_addr(&self, sock_addr: &SockAddr) -> io::Result<()> {
         self.socket.bind(sock_addr)
     }

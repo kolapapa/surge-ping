@@ -14,7 +14,8 @@ log = "0.4.14"
 parking_lot = "0.11.1"
 pnet_packet = "0.28"
 rand = "0.8.3"
-socket2 = { version = "0.4", features = ["all"] }
+#socket2 = { version = "0.4", features = ["all"] }
+socket2 = { git="https://github.com/rust-lang/socket2.git", features = ["all"] }
 thiserror = "1.0"
 tokio = { version = "1.7", features = ["time", "macros"] }
 

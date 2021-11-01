@@ -103,10 +103,6 @@ impl Pinger {
         self.size = size;
         self
     }
-    #[cfg(any(target_os = "android", target_os = "fuchsia", target_os = "linux"))]
-    pub fn bind_device(&self, interface: Option<&[u8]>) -> io::Result<()> {
-        self.socket.bind_device(interface)
-    }
 
     /// The timeout of each Ping, in seconds. (default: 2s)
     pub fn timeout(&mut self, timeout: Duration) -> &mut Pinger {
