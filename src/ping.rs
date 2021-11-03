@@ -16,7 +16,7 @@ use tokio::sync::mpsc::Receiver;
 
 use crate::error::{Result, SurgeError};
 use crate::icmp::{icmpv4, IcmpPacket, icmpv6};
-use crate::pingsocket::AsyncSocket;
+use crate::pingsocket::{AsyncSocket,PingResponse};
 
 type Token = (u16, u16);
 
@@ -64,17 +64,17 @@ pub struct Pinger {
     ttl: u8,
     timeout: Duration,
     socket: AsyncSocket,
-    rx: Receiver<Vec<u8>>,
+    rx: Receiver<PingResponse>,
     cache: Cache
 }
 
 impl Pinger {
     /// Creates a new Ping instance from `IpAddr`.
-    #[deprecated(note="Use the pingsocket::PingSocketBuilder::run as Pinger constructor")]
+    #[deprecated(note="Use the pingsocket::PingSocketBuilder::build as Pinger constructor")]
     pub fn new(host: IpAddr) -> io::Result<Pinger> {
       crate::pingsocket::PingSocket::create_pinger(host)
     }
-    pub(crate) fn new_pinger(host: IpAddr,socket: AsyncSocket,rx: Receiver<Vec<u8>>) -> Pinger {
+    pub(crate) fn new_pinger(host: IpAddr,socket: AsyncSocket,rx: Receiver<PingResponse>) -> Pinger {
         Pinger {
             destination: host,
             ident: random(),
@@ -112,17 +112,16 @@ impl Pinger {
 
     async fn recv_reply(&mut self, seq_cnt: u16) -> Result<(IcmpPacket, Duration)> {
         loop {
-            let buf = self.rx.recv().await.ok_or(SurgeError::NetworkError)?;
-            let curr = Instant::now();
+            let response = self.rx.recv().await.ok_or(SurgeError::NetworkError)?;
             let packet = match self.destination {
-                IpAddr::V4(_) => icmpv4::Icmpv4Packet::decode(&buf).map(IcmpPacket::V4),
-                IpAddr::V6(a) => icmpv6::Icmpv6Packet::decode(&buf, a).map(IcmpPacket::V6),
+                IpAddr::V4(_) => icmpv4::Icmpv4Packet::decode(&response.packet).map(IcmpPacket::V4),
+                IpAddr::V6(a) => icmpv6::Icmpv6Packet::decode(&response.packet, a).map(IcmpPacket::V6),
             };
             match packet {
                 Ok(packet) => {
                     if packet.check_reply_packet(self.destination, seq_cnt, self.ident) {
                         if let Some(ins) = self.cache.remove(self.ident, seq_cnt) {
-                            return Ok((packet, curr - ins));
+                            return Ok((packet, response.when - ins));
                         }
                     }
                 }

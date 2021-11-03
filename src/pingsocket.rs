@@ -8,12 +8,22 @@ use std::net::SocketAddr;
 use tokio::net::UdpSocket;
 use tokio::sync::mpsc::{channel, Sender};
 use tokio::sync::Mutex;
+use std::time::Instant;
 
 #[cfg(unix)]
 use std::os::unix::io::{FromRawFd, IntoRawFd};
 #[cfg(windows)]
 use std::os::windows::io::{FromRawSocket, IntoRawSocket};
 
+pub(crate) struct PingResponse {
+    pub when: Instant,
+    pub packet: Vec<u8>
+}
+impl PingResponse {
+    pub fn new(when:Instant,packet:Vec<u8>) -> PingResponse {
+        PingResponse{when,packet}
+    }
+}
 pub struct PingSocketBuilder {
     socket: Socket,
 }
@@ -76,7 +86,7 @@ impl PingSocketBuilder {
         })?);
     }
 
-    pub fn run(self) -> io::Result<PingSocket> {
+    pub fn build(self) -> io::Result<PingSocket> {
         PingSocket::new_socket(AsyncSocket::new(self.inner_run()?))
     }
 }
@@ -101,13 +111,13 @@ impl AsyncSocket {
 #[derive(Clone)]
 pub struct PingSocket {
     inner: AsyncSocket,
-    pmap: Arc<Mutex<BTreeMap<IpAddr, Sender<Vec<u8>>>>>,
+    pmap: Arc<Mutex<BTreeMap<IpAddr, Sender<PingResponse>>>>,
     recv_task: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>,
 }
 
 impl PingSocket {
     pub fn new(d: Domain) -> io::Result<PingSocket> {
-        PingSocketBuilder::new(d)?.run()
+        PingSocketBuilder::new(d)?.build()
     }
     fn new_socket(inner: AsyncSocket) -> io::Result<PingSocket> {
         Ok(PingSocket {
@@ -122,7 +132,7 @@ impl PingSocket {
             IpAddr::V6(_) => socket2::Domain::IPV6,
         };
         let inner = AsyncSocket::new(PingSocketBuilder::new(domain)?.inner_run()?);
-        let mut pmap = BTreeMap::<IpAddr, Sender<Vec<u8>>>::new();
+        let mut pmap = BTreeMap::<IpAddr, Sender<PingResponse>>::new();
         let recv_task = Arc::new(Mutex::new(None));
         let (tx, rx) = channel(100);
         pmap.insert(addr.clone(), tx);
@@ -132,7 +142,7 @@ impl PingSocket {
     }
     fn run_task(
         inner: AsyncSocket,
-        pmap: Arc<Mutex<BTreeMap<IpAddr, Sender<Vec<u8>>>>>,
+        pmap: Arc<Mutex<BTreeMap<IpAddr, Sender<PingResponse>>>>,
         recv_task: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>,
     ) -> tokio::task::JoinHandle<()> {
         tokio::task::spawn(async move {
@@ -142,13 +152,14 @@ impl PingSocket {
                     Ok(v) => v,
                     Err(_) => break,
                 };
+                let received = Instant::now();
                 let mut pmapguard = pmap.lock().await;
                 let tx = match pmapguard.get(&from_addr.ip()) {
                     None => continue,
                     Some(tx) => tx,
                 };
                 //let btosend = unsafe { assume_init(&buffer[0..sz]) }.to_vec();
-                if tx.try_send(buffer[0..sz].to_vec()).is_err() {
+                if tx.try_send(PingResponse::new(received,buffer[0..sz].to_vec())).is_err() {
                     pmapguard.remove(&from_addr.ip());
                     if pmapguard.len() < 1 {
                         break;

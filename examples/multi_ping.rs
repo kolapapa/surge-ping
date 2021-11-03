@@ -2,7 +2,7 @@ use std::net::IpAddr;
 use std::sync::Arc;
 use std::time::Duration;
 
-use surge_ping::{IcmpPacket, PingSocket};
+use surge_ping::{IcmpPacket, PingSocket, PingSocketBuilder};
 use tokio::time;
 
 #[tokio::main]
@@ -15,7 +15,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "240c::6666",
         "2a02:930::ff76",
     ];
-    let ping_socket_v4 = Arc::new(PingSocket::new(socket2::Domain::IPV4)?);
+    let builder_v4 = PingSocketBuilder::new(socket2::Domain::IPV4)?;
+    let ping_socket_v4 = Arc::new(builder_v4.build()?);
     let ping_socket_v6 = Arc::new(PingSocket::new(socket2::Domain::IPV6)?);
     let mut tasks = Vec::new();
     for ip in &ips {
