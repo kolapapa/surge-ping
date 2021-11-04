@@ -77,13 +77,13 @@ impl PingSocketBuilder {
     }
     fn inner_run(self) -> io::Result<UdpSocket> {
         #[cfg(windows)]
-        return Ok(UdpSocket::from_std(unsafe {
+        return UdpSocket::from_std(unsafe {
             std::net::UdpSocket::from_raw_socket(self.socket.into_raw_socket())
-        })?);
+        });
         #[cfg(unix)]
-        return Ok(UdpSocket::from_std(unsafe {
+        return UdpSocket::from_std(unsafe {
             std::net::UdpSocket::from_raw_fd(self.socket.into_raw_fd())
-        })?);
+        });
     }
 
     pub fn build(self) -> io::Result<PingSocket> {
@@ -121,7 +121,7 @@ impl PingSocket {
     }
     fn new_socket(inner: AsyncSocket) -> io::Result<PingSocket> {
         Ok(PingSocket {
-            inner: inner,
+            inner,
             pmap: Arc::new(Mutex::new(BTreeMap::new())),
             recv_task: Arc::new(Mutex::new(None)),
         })
@@ -135,10 +135,10 @@ impl PingSocket {
         let mut pmap = BTreeMap::<IpAddr, Sender<PingResponse>>::new();
         let recv_task = Arc::new(Mutex::new(None));
         let (tx, rx) = channel(100);
-        pmap.insert(addr.clone(), tx);
+        pmap.insert(addr, tx);
         let pmap = Arc::new(Mutex::new(pmap));
-        Self::run_task(inner.clone(), pmap.clone(), recv_task.clone());
-        Ok(Pinger::new_pinger(addr, inner.clone(), rx))
+        Self::run_task(inner.clone(), pmap, recv_task);
+        Ok(Pinger::new_pinger(addr, inner, rx))
     }
     fn run_task(
         inner: AsyncSocket,
@@ -146,12 +146,8 @@ impl PingSocket {
         recv_task: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>,
     ) -> tokio::task::JoinHandle<()> {
         tokio::task::spawn(async move {
-            let mut buffer = [0 as u8; 2048];
-            loop {
-                let (sz, from_addr) = match inner.recv_from(&mut buffer).await {
-                    Ok(v) => v,
-                    Err(_) => break,
-                };
+            let mut buffer = [0_u8; 2048];
+            while let Ok((sz, from_addr)) = inner.recv_from(&mut buffer).await {
                 let received = Instant::now();
                 let mut pmapguard = pmap.lock().await;
                 let tx = match pmapguard.get(&from_addr.ip()) {
@@ -183,7 +179,7 @@ impl PingSocket {
     }
     pub async fn pinger(&self, addr: IpAddr) -> Pinger {
         let (tx, rx) = channel(100);
-        self.pmap.lock().await.insert(addr.clone(), tx);
+        self.pmap.lock().await.insert(addr, tx);
         self.check_task().await;
         Pinger::new_pinger(addr, self.inner.clone(), rx)
     }

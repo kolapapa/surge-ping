@@ -143,7 +143,7 @@ impl Pinger {
         let ident = self.ident;
         let cache = self.cache.clone();
         task::spawn(async move {
-            if let Err(e) = sender.send_to(&mut packet, &sock_addr.into()).await {
+            if let Err(e) = sender.send_to(&mut packet, &sock_addr).await {
                 trace!("socket send packet error: {}", e)
             }
             cache.insert(ident, seq_cnt, Instant::now());
