@@ -57,5 +57,5 @@ async fn main() {
         // .unwrap()
         .timeout(Duration::from_secs(1));
     let answer = pinger.ping(0).await;
-    info!("{:?}", answer);
+    println!("{:?}", answer);
 }
