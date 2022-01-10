@@ -1,7 +1,6 @@
 use std::{
     collections::HashMap,
     net::{IpAddr, SocketAddr},
-    io,
     sync::Arc,
     time::{Duration, Instant},
 };
@@ -9,14 +8,13 @@ use std::{
 use log::trace;
 use parking_lot::Mutex;
 use rand::random;
+use tokio::sync::{broadcast, mpsc};
 use tokio::task;
 use tokio::time::timeout;
-use tokio::sync::mpsc::Receiver;
 
-
+use crate::client::{AsyncSocket, Message};
 use crate::error::{Result, SurgeError};
-use crate::icmp::{icmpv4, IcmpPacket, icmpv6};
-use crate::pingsocket::{AsyncSocket,PingResponse};
+use crate::icmp::{icmpv4, icmpv6, IcmpPacket};
 
 type Token = (u16, u16);
 
@@ -61,35 +59,40 @@ pub struct Pinger {
     destination: IpAddr,
     ident: u16,
     size: usize,
-    ttl: u8,
     timeout: Duration,
+    expire: Duration,
     socket: AsyncSocket,
-    rx: Receiver<PingResponse>,
-    cache: Cache
+    rx: mpsc::Receiver<Message>,
+    cache: Cache,
+    shutdown_notify: broadcast::Sender<()>,
+}
+
+impl Drop for Pinger {
+    fn drop(&mut self) {
+        if self.shutdown_notify.send(()).is_err() {
+            trace!("notify shutdown error");
+        }
+    }
 }
 
 impl Pinger {
-    /// Creates a new Ping instance from `IpAddr`.
-    #[deprecated(note="Use the pingsocket::PingSocketBuilder::build as Pinger constructor")]
-    pub fn new(host: IpAddr) -> io::Result<Pinger> {
-      crate::pingsocket::PingSocket::create_pinger(host)
-    }
-    pub(crate) fn new_pinger(host: IpAddr,socket: AsyncSocket,rx: Receiver<PingResponse>) -> Pinger {
+    pub(crate) fn new(
+        host: IpAddr,
+        socket: AsyncSocket,
+        rx: mpsc::Receiver<Message>,
+        shutdown_notify: broadcast::Sender<()>,
+    ) -> Pinger {
         Pinger {
             destination: host,
             ident: random(),
             size: 56,
-            ttl: 60,
             timeout: Duration::from_secs(2),
+            expire: Duration::from_secs(2),
             socket,
             rx,
-            cache: Cache::new()
+            cache: Cache::new(),
+            shutdown_notify,
         }
-    }
-
-    pub fn set_ttl(&mut self, ttl: u8) -> &mut Pinger {
-        self.ttl = ttl;
-        self
     }
 
     /// Set the identification of ICMP.
@@ -110,18 +113,26 @@ impl Pinger {
         self
     }
 
+    /// The expire(s) of icmp request.(default: 2s)
+    pub fn expire(&mut self, expire: Duration) -> &mut Pinger {
+        self.expire = expire;
+        self
+    }
+
     async fn recv_reply(&mut self, seq_cnt: u16) -> Result<(IcmpPacket, Duration)> {
         loop {
-            let response = self.rx.recv().await.ok_or(SurgeError::NetworkError)?;
+            let message = self.rx.recv().await.ok_or(SurgeError::NetworkError)?;
             let packet = match self.destination {
-                IpAddr::V4(_) => icmpv4::Icmpv4Packet::decode(&response.packet).map(IcmpPacket::V4),
-                IpAddr::V6(a) => icmpv6::Icmpv6Packet::decode(&response.packet, a).map(IcmpPacket::V6),
+                IpAddr::V4(_) => icmpv4::Icmpv4Packet::decode(&message.packet).map(IcmpPacket::V4),
+                IpAddr::V6(a) => {
+                    icmpv6::Icmpv6Packet::decode(&message.packet, a).map(IcmpPacket::V6)
+                }
             };
             match packet {
                 Ok(packet) => {
                     if packet.check_reply_packet(self.destination, seq_cnt, self.ident) {
                         if let Some(ins) = self.cache.remove(self.ident, seq_cnt) {
-                            return Ok((packet, response.when - ins));
+                            return Ok((packet, message.when - ins));
                         }
                     }
                 }
@@ -161,4 +172,3 @@ impl Pinger {
         }
     }
 }
-

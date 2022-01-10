@@ -1,10 +1,23 @@
+mod client;
+mod config;
 mod error;
 mod icmp;
 mod ping;
-mod pingsocket;
 
+pub use client::Client;
+pub use config::Config;
 pub use error::SurgeError;
-pub use icmp::icmpv4::Icmpv4Packet;
-pub use icmp::IcmpPacket;
+pub use icmp::{icmpv4::Icmpv4Packet, IcmpPacket};
 pub use ping::Pinger;
-pub use pingsocket::{PingSocket, PingSocketBuilder};
+
+#[derive(Debug, Clone, Copy)]
+pub enum ICMP {
+    V4,
+    V6,
+}
+
+impl Default for ICMP {
+    fn default() -> Self {
+        ICMP::V4
+    }
+}
