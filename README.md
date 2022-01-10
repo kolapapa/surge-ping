@@ -30,16 +30,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ```
 
-You can send ICMP packets with custom interface or `set_ttl`
-
-```rust
-pinger.bind_device(Some("eth0".as_bytes()))?;
-
-# You can rely on ttl to implement the icmp version of the traceroute program.
-
-pinger.set_ttl(20)?;
-```
-
 ### Ping(ICMP)
 
 There are two example programs that you can run on your own.
