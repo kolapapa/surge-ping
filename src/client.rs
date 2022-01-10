@@ -79,6 +79,10 @@ impl AsyncSocket {
     }
 }
 
+///
+/// `Client` is a type wrapped by `Arc`, so you can `clone` arbitrarily cheaply,
+/// and can realize the simultaneous ping of multiple addresses when only one `socket` is created.
+///
 #[derive(Clone)]
 pub struct Client {
     socket: AsyncSocket,
@@ -86,7 +90,8 @@ pub struct Client {
 }
 
 impl Client {
-    /// A client is generated according to the configuration. In fact, a `AsyncSocket` is wrapped inside, and you can clone to any `task` at will (`Arc` has been implemented).
+    /// A client is generated according to the configuration. In fact, a `AsyncSocket` is wrapped inside,
+    /// and you can clone to any `task` at will (`Arc` has been implemented).
     pub fn new(config: &Config) -> io::Result<Self> {
         let socket = AsyncSocket::new(config)?;
         Ok(Self {

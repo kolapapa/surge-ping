@@ -8,9 +8,11 @@ use std::{
 use log::trace;
 use parking_lot::Mutex;
 use rand::random;
-use tokio::sync::{broadcast, mpsc};
-use tokio::task;
-use tokio::time::timeout;
+use tokio::{
+    sync::{broadcast, mpsc},
+    task,
+    time::timeout,
+};
 
 use crate::client::{AsyncSocket, Message};
 use crate::error::{Result, SurgeError};
