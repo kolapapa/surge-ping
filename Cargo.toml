@@ -16,13 +16,13 @@ pnet_packet = "0.28.0"
 rand = "0.8.4"
 socket2 = { version = "0.4.2", features = ["all"] }
 thiserror = "1.0.30"
-tokio = { version = "1.14.0", features = ["time", "macros"] }
+tokio = { version = "1.15.0", features = ["time", "macros"] }
 
 [dev-dependencies]
 log = "0.4.14"
 structopt = "0.3.25"
 pretty_env_logger = "0.4.0"
-tokio = { version = "1.14.0", features = ["full"] }
+tokio = { version = "1.15.0", features = ["full"] }
 
 [[example]]
 name = "simple"
