@@ -153,23 +153,23 @@ async fn main() {
         match pinger.ping(idx).await {
             Ok((IcmpPacket::V4(reply), dur)) => {
                 println!(
-                    "{} bytes from {}: icmp_seq={} ttl={} time={:.3} ms",
+                    "{} bytes from {}: icmp_seq={} ttl={} time={:0.3?}",
                     reply.get_size(),
                     reply.get_source(),
                     reply.get_sequence(),
                     reply.get_ttl(),
-                    dur.as_secs_f64() * 1000f64
+                    dur
                 );
                 answer.update(Some(dur));
             }
             Ok((IcmpPacket::V6(reply), dur)) => {
                 println!(
-                    "{} bytes from {}: icmp_seq={} hlim={} time={:.3} ms",
+                    "{} bytes from {}: icmp_seq={} hlim={} time={:0.3?}",
                     reply.get_size(),
                     reply.get_source(),
                     reply.get_sequence(),
                     reply.get_max_hop_limit(),
-                    dur.as_secs_f64() * 1000f64
+                    dur
                 );
                 answer.update(Some(dur));
             }

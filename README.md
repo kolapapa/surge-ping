@@ -16,7 +16,7 @@ use surge_ping::Pinger;
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client = Client::new(&Config::default())?;
-    let mut pinger = Pinger::new("114.114.114.114".parse()?);
+    let mut pinger = client.pinger("114.114.114.114".parse()?);
     pinger.timeout(Duration::from_secs(1));
     for seq_cnt in 0..10 {
         let (reply, dur) = pinger.ping(seq_cnt).await?;
