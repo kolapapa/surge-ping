@@ -62,7 +62,6 @@ pub struct Pinger {
     ident: u16,
     size: usize,
     timeout: Duration,
-    expire: Duration,
     socket: AsyncSocket,
     rx: mpsc::Receiver<Message>,
     cache: Cache,
@@ -89,7 +88,6 @@ impl Pinger {
             ident: random(),
             size: 56,
             timeout: Duration::from_secs(2),
-            expire: Duration::from_secs(2),
             socket,
             rx,
             cache: Cache::new(),
@@ -112,12 +110,6 @@ impl Pinger {
     /// The timeout of each Ping, in seconds. (default: 2s)
     pub fn timeout(&mut self, timeout: Duration) -> &mut Pinger {
         self.timeout = timeout;
-        self
-    }
-
-    /// The expire(s) of icmp request.(default: 2s)
-    pub fn expire(&mut self, expire: Duration) -> &mut Pinger {
-        self.expire = expire;
         self
     }
 
