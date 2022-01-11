@@ -1,5 +1,9 @@
 # surge-ping
 
+A Ping (ICMP) detection tool, you can personalize the Ping parameters. Since version `0.4.0`, a new `Client` data structure
+has been added. This structure wraps the `socket` implementation and can be passed between any task cheaply. If you have multiple
+addresses to detect, you can easily complete it by creating only one system socket(Thanks @wladwm).
+
 [![Crates.io](https://img.shields.io/crates/v/surge-ping.svg)](https://crates.io/crates/surge-ping)
 [![MIT licensed](https://img.shields.io/badge/license-MIT-blue.svg)](https://github.com/kolapapa/surge-ping/blob/main/LICENSE)
 [![API docs](https://docs.rs/surge-ping/badge.svg)](http://docs.rs/surge-ping)

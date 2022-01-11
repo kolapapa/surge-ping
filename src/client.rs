@@ -91,7 +91,7 @@ pub struct Client {
 
 impl Client {
     /// A client is generated according to the configuration. In fact, a `AsyncSocket` is wrapped inside,
-    /// and you can clone to any `task` at will (`Arc` has been implemented).
+    /// and you can clone to any `task` at will.
     pub fn new(config: &Config) -> io::Result<Self> {
         let socket = AsyncSocket::new(config)?;
         Ok(Self {

@@ -58,9 +58,9 @@ impl Cache {
 /// }
 ///
 pub struct Pinger {
-    destination: IpAddr,
-    ident: u16,
-    size: usize,
+    pub destination: IpAddr,
+    pub ident: u16,
+    pub size: usize,
     timeout: Duration,
     socket: AsyncSocket,
     rx: mpsc::Receiver<Message>,

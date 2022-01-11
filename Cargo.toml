@@ -1,9 +1,10 @@
 [package]
 name = "surge-ping"
-version = "0.3.1"
-authors = ["kolapapa <milk346512016@gmail.com>"]
+version = "0.4.0"
+authors = ["kolapapa <kolapapa2021@gmail.com>"]
 edition = "2018"
 license = "MIT"
+homepage = "https://github.com/kolapapa/surge-ping"
 repository = "https://github.com/kolapapa/surge-ping"
 description = "Asynchronous ICMP ping library"
 keywords = ["tokio", "icmp", "ping"]
@@ -23,6 +24,7 @@ log = "0.4.14"
 structopt = "0.3.25"
 pretty_env_logger = "0.4.0"
 tokio = { version = "1.15.0", features = ["full"] }
+futures = "0.3.19"
 
 [[example]]
 name = "simple"

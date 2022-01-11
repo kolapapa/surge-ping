@@ -1,6 +1,7 @@
 use std::net::IpAddr;
 use std::time::Duration;
 
+use futures::future::join_all;
 use surge_ping::{Client, Config, IcmpPacket, ICMP};
 use tokio::time;
 
@@ -18,26 +19,24 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let client_v6 = Client::new(&Config::builder().kind(ICMP::V6).build())?;
     let mut tasks = Vec::new();
     for ip in &ips {
-        let addr: IpAddr = ip.parse()?;
-        let surge = match addr {
-            IpAddr::V4(_) => client_v4.clone(),
-            IpAddr::V6(_) => client_v6.clone(),
-        };
-        tasks.push(tokio::spawn(async move {
-            ping(surge, addr, 56).await.unwrap();
-        }));
+        match ip.parse() {
+            Ok(IpAddr::V4(addr)) => {
+                tasks.push(tokio::spawn(ping(client_v4.clone(), IpAddr::V4(addr))))
+            }
+            Ok(IpAddr::V6(addr)) => {
+                tasks.push(tokio::spawn(ping(client_v6.clone(), IpAddr::V6(addr))))
+            }
+            Err(e) => println!("{} parse to ipaddr error: {}", ip, e),
+        }
     }
-    for t in tasks.into_iter() {
-        t.await?;
-    }
-    //signal::ctrl_c().await?;
-    //println!("ctrl-c received!");
+
+    join_all(tasks).await;
     Ok(())
 }
 // Ping an address 5 times， and print output message（interval 1s）
-async fn ping(client: Client, addr: IpAddr, size: usize) -> Result<(), Box<dyn std::error::Error>> {
+async fn ping(client: Client, addr: IpAddr) {
     let mut pinger = client.pinger(addr).await;
-    pinger.size(size).timeout(Duration::from_secs(1));
+    pinger.size(56).timeout(Duration::from_secs(1));
     let mut interval = time::interval(Duration::from_secs(1));
     for idx in 0..5 {
         interval.tick().await;
@@ -60,9 +59,8 @@ async fn ping(client: Client, addr: IpAddr, size: usize) -> Result<(), Box<dyn s
                 packet.get_max_hop_limit(),
                 dur
             ),
-            Err(e) => println!("No.{}: {} ping {}", idx, addr, e),
+            Err(e) => println!("No.{}: {} ping {}", idx, pinger.destination, e),
         };
     }
-    println!("[+] {} done.", addr);
-    Ok(())
+    println!("[+] {} done.", pinger.destination);
 }
