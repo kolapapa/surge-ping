@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use structopt::StructOpt;
-use surge_ping::{IcmpPacket, Pinger};
+use surge_ping::{Client, Config, IcmpPacket};
 use tokio::time;
 
 #[derive(Default, Debug)]
@@ -137,13 +137,14 @@ async fn main() {
         .unwrap();
 
     let mut interval = time::interval(Duration::from_millis((opt.interval * 1000f64) as u64));
-    let mut pinger = Pinger::new(ip).unwrap();
-    pinger.timeout(Duration::from_secs(opt.timeout));
+    let config = match opt.iface {
+        Some(val) => Config::builder().interface(&val).build(),
+        None => Config::default(),
+    };
 
-    #[cfg(target_os = "linux")]
-    pinger
-        .bind_device(opt.iface.as_deref().map(|val| val.as_bytes()))
-        .unwrap();
+    let client = Client::new(&config).unwrap();
+    let mut pinger = client.pinger(ip).await;
+    pinger.timeout(Duration::from_secs(opt.timeout));
 
     let mut answer = Answer::new(&opt.host);
     println!("PING {} ({}): {} data bytes", opt.host, ip, opt.size);
@@ -152,23 +153,23 @@ async fn main() {
         match pinger.ping(idx).await {
             Ok((IcmpPacket::V4(reply), dur)) => {
                 println!(
-                    "{} bytes from {}: icmp_seq={} ttl={} time={:.3} ms",
+                    "{} bytes from {}: icmp_seq={} ttl={} time={:0.3?}",
                     reply.get_size(),
                     reply.get_source(),
                     reply.get_sequence(),
                     reply.get_ttl(),
-                    dur.as_secs_f64() * 1000f64
+                    dur
                 );
                 answer.update(Some(dur));
             }
             Ok((IcmpPacket::V6(reply), dur)) => {
                 println!(
-                    "{} bytes from {}: icmp_seq={} hlim={} time={:.3} ms",
+                    "{} bytes from {}: icmp_seq={} hlim={} time={:0.3?}",
                     reply.get_size(),
                     reply.get_source(),
                     reply.get_sequence(),
                     reply.get_max_hop_limit(),
-                    dur.as_secs_f64() * 1000f64
+                    dur
                 );
                 answer.update(Some(dur));
             }
