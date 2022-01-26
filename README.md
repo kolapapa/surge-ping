@@ -19,8 +19,9 @@ use surge_ping::Pinger;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let client = Client::new(&Config::default())?;
-    let mut pinger = client.pinger("114.114.114.114".parse()?);
+    let mut pinger = surge_ping::pinger("114.114.114.114".parse()?).await?;
+    // let client = Client::new(&Config::default())?;
+    // let mut pinger = client.pinger("114.114.114.114".parse()?);
     pinger.timeout(Duration::from_secs(1));
     for seq_cnt in 0..10 {
         let (reply, dur) = pinger.ping(seq_cnt).await?;
@@ -36,7 +37,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 
 ### Ping(ICMP)
 
-There are two example programs that you can run on your own.
+There are three example programs that you can run on your own.
 
 ```shell
 $ git clone https://github.com/kolapapa/surge-ping.git

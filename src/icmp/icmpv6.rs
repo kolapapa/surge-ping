@@ -9,16 +9,12 @@ use crate::error::{MalformedPacketError, Result, SurgeError};
 
 #[allow(dead_code)]
 pub fn make_icmpv6_echo_packet(ident: u16, seq_cnt: u16, size: usize) -> Result<Vec<u8>> {
-    let mut buf = vec![0u8; 4 + 2 + 2 + size]; // 4 bytes ICMP header + 2 bytes ident + 2 bytes sequence, then payload
-    let mut packet =
-        icmpv6::MutableIcmpv6Packet::new(&mut buf[..]).ok_or(SurgeError::IncorrectBufferSize)?;
+    let mut buf = vec![0; 8 + size]; // 8 bytes of header, then payload
+    let mut packet = icmpv6::echo_request::MutableEchoRequestPacket::new(&mut buf[..])
+        .ok_or(SurgeError::IncorrectBufferSize)?;
     packet.set_icmpv6_type(icmpv6::Icmpv6Types::EchoRequest);
-
-    // Encode the identifier and sequence directly in the payload
-    let mut payload = vec![0; 4];
-    payload[0..2].copy_from_slice(&ident.to_be_bytes()[..]);
-    payload[2..4].copy_from_slice(&seq_cnt.to_be_bytes()[..]);
-    packet.set_payload(&payload);
+    packet.set_identifier(ident);
+    packet.set_sequence_number(seq_cnt);
 
     // Per https://tools.ietf.org/html/rfc3542#section-3.1 the checksum is
     // omitted, the kernel will insert it.
@@ -150,15 +146,9 @@ impl Icmpv6Packet {
 
     /// Decode into icmpv6 packet from the socket message.
     pub fn decode(buf: &[u8], destination: Ipv6Addr) -> Result<Self> {
-        log::info!("{:?}", buf);
-        // let ipv6_packet = ipv6::Ipv6Packet::new(buf)
-        //     .ok_or_else(|| SurgeError::from(MalformedPacketError::NotIpv4Packet))?;
-        // let payload = ipv6_packet.payload();
+        // The IPv6 header is automatically cropped off when recvfrom() is used.
         let icmpv6_packet = icmpv6::Icmpv6Packet::new(buf)
             .ok_or_else(|| SurgeError::from(MalformedPacketError::NotIcmpv6Packet))?;
-        log::info!("{:?}", &icmpv6_packet);
-        log::info!("{:?}", &icmpv6_packet.get_icmpv6_type());
-        log::info!("{:?}", icmpv6::Icmpv6Types::EchoReply);
         let icmpv6_payload = icmpv6_packet.payload();
         match icmpv6_packet.get_icmpv6_type() {
             icmpv6::Icmpv6Types::EchoRequest => Err(SurgeError::EchoRequestPacket),
@@ -180,7 +170,6 @@ impl Icmpv6Packet {
             }
             _ => {
                 // ipv6 header(40) + icmpv6 echo header(4)
-                log::info!("{:?}", icmpv6_payload);
                 let identifier = u16::from_be_bytes(icmpv6_payload[44..46].try_into().unwrap());
                 let sequence = u16::from_be_bytes(icmpv6_payload[46..48].try_into().unwrap());
                 let mut packet = Icmpv6Packet::default();

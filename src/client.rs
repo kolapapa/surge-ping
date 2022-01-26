@@ -121,7 +121,7 @@ async fn recv_task(
     mapping: Arc<Mutex<HashMap<IpAddr, mpsc::Sender<Message>>>>,
     mut shutdown_rx: broadcast::Receiver<()>,
 ) {
-    let mut buf = [0; 1024];
+    let mut buf = [0; 2048];
     loop {
         tokio::select! {
             answer = socket.recv_from(&mut buf) => {

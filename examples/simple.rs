@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use structopt::StructOpt;
-use surge_ping::{Client, Config};
+use surge_ping::{Client, Config, ICMP};
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "surge-ping")]
@@ -33,10 +33,16 @@ async fn main() {
         .map(|val| val.ip())
         .unwrap();
 
-    let config = match opt.iface {
-        Some(val) => Config::builder().interface(&val).build(),
-        None => Config::default(),
-    };
+    let mut config_builder = Config::builder();
+
+    if let Some(interface) = opt.iface {
+        config_builder = config_builder.interface(&interface);
+    }
+
+    if ip.is_ipv6() {
+        config_builder = config_builder.kind(ICMP::V6);
+    }
+    let config = config_builder.build();
 
     let client = Client::new(&config).unwrap();
     let mut pinger = client.pinger(ip).await;

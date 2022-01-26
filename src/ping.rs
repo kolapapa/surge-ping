@@ -42,21 +42,6 @@ impl Cache {
 }
 
 /// A Ping struct represents the state of one particular ping instance.
-///
-/// # Examples
-/// ```
-/// use std::time::Duration;
-///
-/// use surge_ping::Pinger;
-///
-/// #[tokio::main]
-/// async fn main() {
-///     let mut pinger = Pinger::new("114.114.114.114".parse().unwrap()).unwrap();
-///     pinger.size(56).timeout(Duration::from_secs(1));
-///     let result = pinger.ping(0).await;
-///     println!("{:?}", result);
-/// }
-///
 pub struct Pinger {
     pub destination: IpAddr,
     pub ident: u16,
