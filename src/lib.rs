@@ -7,7 +7,7 @@ mod ping;
 use std::net::IpAddr;
 
 pub use client::Client;
-pub use config::Config;
+pub use config::{Config, ConfigBuilder};
 pub use error::SurgeError;
 pub use icmp::{icmpv4::Icmpv4Packet, icmpv6::Icmpv6Packet, IcmpPacket};
 pub use ping::Pinger;
