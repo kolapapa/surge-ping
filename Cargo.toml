@@ -18,6 +18,7 @@ rand = "0.8.4"
 socket2 = { version = "0.4.3", features = ["all"] }
 thiserror = "1.0.30"
 tokio = { version = "1.15.0", features = ["time", "macros"] }
+uuid = { version = "0.8.2", features = ["v4"]}
 
 [dev-dependencies]
 log = "0.4.14"

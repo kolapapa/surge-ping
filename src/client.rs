@@ -18,6 +18,7 @@ use tokio::{
     sync::{broadcast, mpsc, Mutex},
     task,
 };
+use uuid::Uuid;
 
 use crate::{config::Config, Pinger, ICMP};
 
@@ -86,7 +87,7 @@ impl AsyncSocket {
 #[derive(Clone)]
 pub struct Client {
     socket: AsyncSocket,
-    mapping: Arc<Mutex<HashMap<IpAddr, mpsc::Sender<Message>>>>,
+    mapping: Arc<Mutex<HashMap<String, mpsc::Sender<Message>>>>,
 }
 
 impl Client {
@@ -104,10 +105,12 @@ impl Client {
     pub async fn pinger(&self, host: IpAddr) -> Pinger {
         let (shutdown_tx, _) = broadcast::channel(1);
         let (tx, rx) = mpsc::channel(10);
+        let magic_key = Uuid::new_v4().to_string();
         {
-            self.mapping.lock().await.insert(host, tx);
+            self.mapping.lock().await.insert(magic_key.clone(), tx);
         }
         task::spawn(recv_task(
+            magic_key,
             self.socket.clone(),
             self.mapping.clone(),
             shutdown_tx.subscribe(),
@@ -117,21 +120,22 @@ impl Client {
 }
 
 async fn recv_task(
+    magic_key: String,
     socket: AsyncSocket,
-    mapping: Arc<Mutex<HashMap<IpAddr, mpsc::Sender<Message>>>>,
+    mapping: Arc<Mutex<HashMap<String, mpsc::Sender<Message>>>>,
     mut shutdown_rx: broadcast::Receiver<()>,
 ) {
     let mut buf = [0; 2048];
     loop {
         tokio::select! {
             answer = socket.recv_from(&mut buf) => {
-                if let Ok((sz, addr)) = answer {
+                if let Ok((sz, _addr)) = answer {
                     let instant = Instant::now();
                     let mut w = mapping.lock().await;
-                    if let Some(tx) = (*w).get(&addr.ip()) {
+                    if let Some(tx) = (*w).get(&magic_key) {
                         if tx.send(Message::new(instant, buf[0..sz].to_vec())).await.is_err() {
                             trace!("send message error");
-                            (*w).remove(&addr.ip());
+                            (*w).remove(&magic_key);
                         }
                     }
                 }
