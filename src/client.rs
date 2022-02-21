@@ -11,13 +11,14 @@ use std::{
     time::Instant,
 };
 
-use log::trace;
+use pnet_packet::{icmp, icmpv6, ipv4, ipv6, Packet};
 use socket2::{Domain, Protocol, Socket, Type};
 use tokio::{
     net::UdpSocket,
     sync::{broadcast, mpsc, Mutex},
     task,
 };
+use tracing::warn;
 use uuid::Uuid;
 
 use crate::{config::Config, Pinger, ICMP};
@@ -87,55 +88,67 @@ impl AsyncSocket {
 #[derive(Clone)]
 pub struct Client {
     socket: AsyncSocket,
-    mapping: Arc<Mutex<HashMap<String, mpsc::Sender<Message>>>>,
+    mapping: Arc<Mutex<HashMap<Uuid, mpsc::Sender<Message>>>>,
+    shutdown_notify: broadcast::Sender<()>,
+}
+
+impl Drop for Client {
+    fn drop(&mut self) {
+        if self.shutdown_notify.send(()).is_err() {
+            warn!("notify shutdown error");
+        }
+    }
 }
 
 impl Client {
     /// A client is generated according to the configuration. In fact, a `AsyncSocket` is wrapped inside,
     /// and you can clone to any `task` at will.
-    pub fn new(config: &Config) -> io::Result<Self> {
+    pub async fn new(config: &Config) -> io::Result<Self> {
+        let (shutdown_tx, _) = broadcast::channel(1);
         let socket = AsyncSocket::new(config)?;
+        let mapping = Arc::new(Mutex::new(HashMap::new()));
+        task::spawn(recv_task(
+            socket.clone(),
+            mapping.clone(),
+            shutdown_tx.subscribe(),
+        ));
         Ok(Self {
             socket,
-            mapping: Arc::new(Mutex::new(HashMap::new())),
+            mapping,
+            shutdown_notify: shutdown_tx,
         })
     }
 
     /// Create a `Pinger` instance, you can make special configuration for this instance. Such as `timeout`, `size` etc.
     pub async fn pinger(&self, host: IpAddr) -> Pinger {
-        let (shutdown_tx, _) = broadcast::channel(1);
         let (tx, rx) = mpsc::channel(10);
-        let magic_key = Uuid::new_v4().to_string();
+        let key = Uuid::new_v4();
         {
-            self.mapping.lock().await.insert(magic_key.clone(), tx);
+            self.mapping.lock().await.insert(key, tx);
         }
-        task::spawn(recv_task(
-            magic_key,
-            self.socket.clone(),
-            self.mapping.clone(),
-            shutdown_tx.subscribe(),
-        ));
-        Pinger::new(host, self.socket.clone(), rx, shutdown_tx)
+        Pinger::new(host, self.socket.clone(), rx, key)
     }
 }
 
 async fn recv_task(
-    magic_key: String,
     socket: AsyncSocket,
-    mapping: Arc<Mutex<HashMap<String, mpsc::Sender<Message>>>>,
+    mapping: Arc<Mutex<HashMap<Uuid, mpsc::Sender<Message>>>>,
     mut shutdown_rx: broadcast::Receiver<()>,
 ) {
     let mut buf = [0; 2048];
     loop {
         tokio::select! {
             answer = socket.recv_from(&mut buf) => {
-                if let Ok((sz, _addr)) = answer {
-                    let instant = Instant::now();
-                    let mut w = mapping.lock().await;
-                    if let Some(tx) = (*w).get(&magic_key) {
-                        if tx.send(Message::new(instant, buf[0..sz].to_vec())).await.is_err() {
-                            trace!("send message error");
-                            (*w).remove(&magic_key);
+                if let Ok((sz, addr)) = answer {
+                    let datas = buf[0..sz].to_vec();
+                    if let Some(uuid) = gen_uuid_with_payload(addr.ip(), datas.as_slice()) {
+                        let instant = Instant::now();
+                        let mut w = mapping.lock().await;
+                        if let Some(tx) = (*w).get(&uuid) {
+                            if tx.send(Message::new(instant, datas)).await.is_err() {
+                                warn!("{} send message error", addr);
+                                (*w).remove(&uuid);
+                            }
                         }
                     }
                 }
@@ -145,4 +158,28 @@ async fn recv_task(
             }
         }
     }
+}
+
+fn gen_uuid_with_payload(addr: IpAddr, datas: &[u8]) -> Option<Uuid> {
+    match addr {
+        IpAddr::V4(_) => {
+            if let Some(ip_packet) = ipv4::Ipv4Packet::new(datas) {
+                if let Some(icmp_packet) = icmp::IcmpPacket::new(ip_packet.payload()) {
+                    let payload = icmp_packet.payload();
+                    let uuid = &payload[4..20];
+                    return Uuid::from_slice(uuid).ok();
+                }
+            }
+        }
+        IpAddr::V6(_) => {
+            if let Some(ipv6_packet) = ipv6::Ipv6Packet::new(datas) {
+                if let Some(icmpv6_packet) = icmpv6::Icmpv6Packet::new(ipv6_packet.payload()) {
+                    let payload = icmpv6_packet.payload();
+                    let uuid = &payload[4..20];
+                    return Uuid::from_slice(uuid).ok();
+                }
+            }
+        }
+    }
+    None
 }

@@ -7,6 +7,7 @@ use tokio::time;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    // test same url 114.114.114.114
     let ips = [
         "114.114.114.114",
         "8.8.8.8",
@@ -14,9 +15,10 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "172.217.26.142",
         "240c::6666",
         "2a02:930::ff76",
+        "114.114.114.114",
     ];
-    let client_v4 = Client::new(&Config::default())?;
-    let client_v6 = Client::new(&Config::builder().kind(ICMP::V6).build())?;
+    let client_v4 = Client::new(&Config::default()).await?;
+    let client_v6 = Client::new(&Config::builder().kind(ICMP::V6).build()).await?;
     let mut tasks = Vec::new();
     for ip in &ips {
         match ip.parse() {

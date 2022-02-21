@@ -11,13 +11,13 @@ keywords = ["tokio", "icmp", "ping"]
 categories = ["network-programming", "asynchronous"]
 
 [dependencies]
-log = "0.4.14"
 parking_lot = "0.11.2"
 pnet_packet = "0.29.0"
 rand = "0.8.4"
 socket2 = { version = "0.4.3", features = ["all"] }
 thiserror = "1.0.30"
 tokio = { version = "1.15.0", features = ["time", "macros"] }
+tracing = "0.1.31"
 uuid = { version = "0.8.2", features = ["v4"]}
 
 [dev-dependencies]
