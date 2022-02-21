@@ -75,9 +75,9 @@ impl Pinger {
         self
     }
 
-    /// Set the packet size.(default: 56)
+    /// Set the packet payload size, minimal is 16. (default: 56)
     pub fn size(&mut self, size: usize) -> &mut Pinger {
-        self.size = size;
+        self.size = if size < 16 { 16 } else { size };
         self
     }
 
