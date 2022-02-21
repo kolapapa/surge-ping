@@ -7,13 +7,19 @@ use pnet_packet::{ipv4, PacketSize};
 
 use crate::error::{MalformedPacketError, Result, SurgeError};
 
-pub fn make_icmpv4_echo_packet(ident: u16, seq_cnt: u16, size: usize) -> Result<Vec<u8>> {
+pub fn make_icmpv4_echo_packet(
+    ident: u16,
+    seq_cnt: u16,
+    size: usize,
+    key: &[u8],
+) -> Result<Vec<u8>> {
     let mut buf = vec![0; 8 + size]; // 8 bytes of header, then payload
     let mut packet = icmp::echo_request::MutableEchoRequestPacket::new(&mut buf[..])
         .ok_or(SurgeError::IncorrectBufferSize)?;
     packet.set_icmp_type(icmp::IcmpTypes::EchoRequest);
     packet.set_identifier(ident);
     packet.set_sequence_number(seq_cnt);
+    packet.set_payload(key);
 
     // Calculate and set the checksum
     let icmp_packet =

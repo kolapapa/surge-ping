@@ -8,13 +8,19 @@ use pnet_packet::PacketSize;
 use crate::error::{MalformedPacketError, Result, SurgeError};
 
 #[allow(dead_code)]
-pub fn make_icmpv6_echo_packet(ident: u16, seq_cnt: u16, size: usize) -> Result<Vec<u8>> {
+pub fn make_icmpv6_echo_packet(
+    ident: u16,
+    seq_cnt: u16,
+    size: usize,
+    key: &[u8],
+) -> Result<Vec<u8>> {
     let mut buf = vec![0; 8 + size]; // 8 bytes of header, then payload
     let mut packet = icmpv6::echo_request::MutableEchoRequestPacket::new(&mut buf[..])
         .ok_or(SurgeError::IncorrectBufferSize)?;
     packet.set_icmpv6_type(icmpv6::Icmpv6Types::EchoRequest);
     packet.set_identifier(ident);
     packet.set_sequence_number(seq_cnt);
+    packet.set_payload(key);
 
     // Per https://tools.ietf.org/html/rfc3542#section-3.1 the checksum is
     // omitted, the kernel will insert it.

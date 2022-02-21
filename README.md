@@ -15,7 +15,7 @@ rust ping libray based on `tokio` + `socket2` + `pnet_packet`.
 ```rust
 use std::time::Duration;
 
-use surge_ping::Pinger;
+use surge_ping::IcmpPacket;
 
 #[tokio::main]
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -24,11 +24,19 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     // let mut pinger = client.pinger("114.114.114.114".parse()?);
     pinger.timeout(Duration::from_secs(1));
     for seq_cnt in 0..10 {
-        let (reply, dur) = pinger.ping(seq_cnt).await?;
-        println!(
-            "{} bytes from {}: icmp_seq={} ttl={:?} time={:?}",
-            reply.size, reply.source, reply.sequence, reply.ttl, dur
-        );
+        match pinger.ping(seq_cnt).await? {
+            (IcmpPacket::V4(packet), dur) => {
+                println!(
+                    "{} bytes from {}: icmp_seq={} ttl={:?} time={:?}",
+                    packet.get_size(),
+                    packet.get_source(),
+                    packet.get_sequence(),
+                    packet.get_ttl(),
+                    dur
+                );
+            }
+            (IcmpPacket::V6(_), dur) => unreachable!(),
+        }
     }
     Ok(())
 }

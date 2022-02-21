@@ -147,7 +147,7 @@ async fn main() {
     }
     let config = config_builder.build();
 
-    let client = Client::new(&config).unwrap();
+    let client = Client::new(&config).await.unwrap();
     let mut pinger = client.pinger(ip).await;
     pinger.timeout(Duration::from_secs(opt.timeout));
 

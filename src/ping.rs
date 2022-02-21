@@ -5,14 +5,11 @@ use std::{
     time::{Duration, Instant},
 };
 
-use log::trace;
 use parking_lot::Mutex;
 use rand::random;
-use tokio::{
-    sync::{broadcast, mpsc},
-    task,
-    time::timeout,
-};
+use tokio::{sync::mpsc, task, time::timeout};
+use tracing::error;
+use uuid::Uuid;
 
 use crate::client::{AsyncSocket, Message};
 use crate::error::{Result, SurgeError};
@@ -50,15 +47,7 @@ pub struct Pinger {
     socket: AsyncSocket,
     rx: mpsc::Receiver<Message>,
     cache: Cache,
-    shutdown_notify: broadcast::Sender<()>,
-}
-
-impl Drop for Pinger {
-    fn drop(&mut self) {
-        if self.shutdown_notify.send(()).is_err() {
-            trace!("notify shutdown error");
-        }
-    }
+    key: Uuid,
 }
 
 impl Pinger {
@@ -66,7 +55,7 @@ impl Pinger {
         host: IpAddr,
         socket: AsyncSocket,
         rx: mpsc::Receiver<Message>,
-        shutdown_notify: broadcast::Sender<()>,
+        key: Uuid,
     ) -> Pinger {
         Pinger {
             destination: host,
@@ -76,7 +65,7 @@ impl Pinger {
             socket,
             rx,
             cache: Cache::new(),
-            shutdown_notify,
+            key,
         }
     }
 
@@ -86,9 +75,9 @@ impl Pinger {
         self
     }
 
-    /// Set the packet size.(default: 56)
+    /// Set the packet payload size, minimal is 16. (default: 56)
     pub fn size(&mut self, size: usize) -> &mut Pinger {
-        self.size = size;
+        self.size = if size < 16 { 16 } else { size };
         self
     }
 
@@ -125,8 +114,18 @@ impl Pinger {
     pub async fn ping(&mut self, seq_cnt: u16) -> Result<(IcmpPacket, Duration)> {
         let sender = self.socket.clone();
         let mut packet = match self.destination {
-            IpAddr::V4(_) => icmpv4::make_icmpv4_echo_packet(self.ident, seq_cnt, self.size)?,
-            IpAddr::V6(_) => icmpv6::make_icmpv6_echo_packet(self.ident, seq_cnt, self.size)?,
+            IpAddr::V4(_) => icmpv4::make_icmpv4_echo_packet(
+                self.ident,
+                seq_cnt,
+                self.size,
+                self.key.as_bytes(),
+            )?,
+            IpAddr::V6(_) => icmpv6::make_icmpv6_echo_packet(
+                self.ident,
+                seq_cnt,
+                self.size,
+                self.key.as_bytes(),
+            )?,
         };
         // let mut packet = EchoRequest::new(self.host, self.ident, seq_cnt, self.size).encode()?;
         let sock_addr = SocketAddr::new(self.destination, 0);
@@ -134,7 +133,7 @@ impl Pinger {
         let cache = self.cache.clone();
         task::spawn(async move {
             if let Err(e) = sender.send_to(&mut packet, &sock_addr).await {
-                trace!("socket send packet error: {}", e)
+                error!("socket send packet error: {}", e)
             }
             cache.insert(ident, seq_cnt, Instant::now());
         });

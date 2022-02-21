@@ -46,7 +46,7 @@ pub async fn pinger(host: IpAddr) -> Result<Pinger, SurgeError> {
         IpAddr::V4(_) => Config::default(),
         IpAddr::V6(_) => Config::builder().kind(ICMP::V6).build(),
     };
-    let client = Client::new(&config)?;
+    let client = Client::new(&config).await?;
     let pinger = client.pinger(host).await;
     Ok(pinger)
 }
