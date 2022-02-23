@@ -1,6 +1,6 @@
 [package]
 name = "surge-ping"
-version = "0.4.2"
+version = "0.5.0"
 authors = ["kolapapa <kolapapa2021@gmail.com>"]
 edition = "2018"
 license = "MIT"
