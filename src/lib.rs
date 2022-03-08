@@ -44,7 +44,7 @@ impl Default for ICMP {
 ///
 /// - socket create failed
 ///
-pub async fn ping(host: IpAddr) -> error::Result<(IcmpPacket, Duration)> {
+pub async fn ping(host: IpAddr) -> Result<(IcmpPacket, Duration), SurgeError> {
     let config = match host {
         IpAddr::V4(_) => Config::default(),
         IpAddr::V6(_) => Config::builder().kind(ICMP::V6).build(),

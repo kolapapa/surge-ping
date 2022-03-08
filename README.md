@@ -12,36 +12,31 @@ rust ping libray based on `tokio` + `socket2` + `pnet_packet`.
 
 ## Example
 
-```rust
-use std::time::Duration;
+simple usage:
 
+```rust
 use surge_ping::IcmpPacket;
 
 #[tokio::main]
-async fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut pinger = surge_ping::pinger("114.114.114.114".parse()?).await?;
-    // let client = Client::new(&Config::default())?;
-    // let mut pinger = client.pinger("114.114.114.114".parse()?);
-    pinger.timeout(Duration::from_secs(1));
-    for seq_cnt in 0..10 {
-        match pinger.ping(seq_cnt).await? {
-            (IcmpPacket::V4(packet), dur) => {
-                println!(
-                    "{} bytes from {}: icmp_seq={} ttl={:?} time={:?}",
-                    packet.get_size(),
-                    packet.get_source(),
-                    packet.get_sequence(),
-                    packet.get_ttl(),
-                    dur
-                );
-            }
-            (IcmpPacket::V6(_), dur) => unreachable!(),
+async fn main() {
+    match surge_ping::ping("127.0.0.1".parse().unwrap()).await {
+        Ok((IcmpPacket::V4(packet), duration)) => {
+            println!(
+                "{} bytes from {}: icmp_seq={} ttl={:?} time={:.2?}",
+                packet.get_size(),
+                packet.get_source(),
+                packet.get_sequence(),
+                packet.get_ttl(),
+                duration
+            );
         }
-    }
-    Ok(())
+        Ok(_) => unreachable!(),
+        Err(e) => println!("{:?}", e),
+    };
 }
-
 ```
+
+multi address usage: [multi_ping.rs](https://github.com/kolapapa/surge-ping/blob/main/examples/multi_ping.rs)
 
 ### Ping(ICMP)
 
