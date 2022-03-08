@@ -4,7 +4,7 @@ mod error;
 mod icmp;
 mod ping;
 
-use std::net::IpAddr;
+use std::{net::IpAddr, time::Duration};
 
 pub use client::Client;
 pub use config::{Config, ConfigBuilder};
@@ -24,7 +24,7 @@ impl Default for ICMP {
     }
 }
 
-/// Shortcut method to quickly make a `Pinger`.
+/// Shortcut method to ping address.
 /// **NOTE**: This function creates a new internal `Client` on each call,
 /// and so should not be used if making many target. Create a
 /// [`Client`](./struct.Client.html) instead.
@@ -32,7 +32,10 @@ impl Default for ICMP {
 /// # Examples
 ///
 /// ```rust
-/// let mut pinger = surge_ping::pinger("8.8.8.8".parse()?).await?;
+/// match surge_ping::ping("127.0.0.1".parse()?).await {
+///     Ok((_packet, duration)) => println!("duration: {:.2?}", duration),
+///     Err(e) => println!("{:?}", e),
+/// };
 /// ```
 ///
 /// # Errors
@@ -41,12 +44,12 @@ impl Default for ICMP {
 ///
 /// - socket create failed
 ///
-pub async fn pinger(host: IpAddr) -> Result<Pinger, SurgeError> {
+pub async fn ping(host: IpAddr) -> Result<(IcmpPacket, Duration), SurgeError> {
     let config = match host {
         IpAddr::V4(_) => Config::default(),
         IpAddr::V6(_) => Config::builder().kind(ICMP::V6).build(),
     };
     let client = Client::new(&config).await?;
-    let pinger = client.pinger(host).await;
-    Ok(pinger)
+    let mut pinger = client.pinger(host).await;
+    pinger.ping(0).await
 }
