@@ -94,10 +94,8 @@ pub struct Client {
 
 impl Drop for Client {
     fn drop(&mut self) {
-        println!("client is drop");
         if self.shutdown_tx.send(()).is_err() {
             warn!("Client shutdown error.");
-            println!("client shutdown error");
         }
     }
 }
