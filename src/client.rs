@@ -15,7 +15,7 @@ use pnet_packet::{icmp, icmpv6, ipv4, ipv6, Packet};
 use socket2::{Domain, Protocol, Socket, Type};
 use tokio::{
     net::UdpSocket,
-    sync::{mpsc, Mutex},
+    sync::{broadcast, mpsc, Mutex},
     task,
 };
 use tracing::warn;
@@ -89,6 +89,17 @@ impl AsyncSocket {
 pub struct Client {
     socket: AsyncSocket,
     mapping: Arc<Mutex<HashMap<Uuid, mpsc::Sender<Message>>>>,
+    shutdown_tx: broadcast::Sender<()>,
+}
+
+impl Drop for Client {
+    fn drop(&mut self) {
+        println!("client is drop");
+        if self.shutdown_tx.send(()).is_err() {
+            warn!("Client shutdown error.");
+            println!("client shutdown error");
+        }
+    }
 }
 
 impl Client {
@@ -97,8 +108,18 @@ impl Client {
     pub async fn new(config: &Config) -> io::Result<Self> {
         let socket = AsyncSocket::new(config)?;
         let mapping = Arc::new(Mutex::new(HashMap::new()));
-        task::spawn(recv_task(socket.clone(), mapping.clone()));
-        Ok(Self { socket, mapping })
+        let (shutdown_tx, _) = broadcast::channel(1);
+        task::spawn(recv_task(
+            socket.clone(),
+            mapping.clone(),
+            shutdown_tx.subscribe(),
+        ));
+
+        Ok(Self {
+            socket,
+            mapping,
+            shutdown_tx,
+        })
     }
 
     /// Create a `Pinger` instance, you can make special configuration for this instance. Such as `timeout`, `size` etc.
@@ -108,24 +129,36 @@ impl Client {
         {
             self.mapping.lock().await.insert(key, tx);
         }
-        Pinger::new(host, self.socket.clone(), rx, key)
+        Pinger::new(host, self.socket.clone(), rx, key, self.mapping.clone())
     }
 }
 
-async fn recv_task(socket: AsyncSocket, mapping: Arc<Mutex<HashMap<Uuid, mpsc::Sender<Message>>>>) {
+async fn recv_task(
+    socket: AsyncSocket,
+    mapping: Arc<Mutex<HashMap<Uuid, mpsc::Sender<Message>>>>,
+    mut shutdown_rx: broadcast::Receiver<()>,
+) {
     let mut buf = [0; 2048];
+
     loop {
-        if let Ok((sz, addr)) = socket.recv_from(&mut buf).await {
-            let datas = buf[0..sz].to_vec();
-            if let Some(uuid) = gen_uuid_with_payload(addr.ip(), datas.as_slice()) {
-                let instant = Instant::now();
-                let mut w = mapping.lock().await;
-                if let Some(tx) = (*w).get(&uuid) {
-                    if tx.send(Message::new(instant, datas)).await.is_err() {
-                        warn!("Pinger({}) already closed.", addr);
-                        (*w).remove(&uuid);
+        tokio::select! {
+            response = socket.recv_from(&mut buf) => {
+                if let Ok((sz, addr)) = response {
+                    let datas = buf[0..sz].to_vec();
+                    if let Some(uuid) = gen_uuid_with_payload(addr.ip(), datas.as_slice()) {
+                        let instant = Instant::now();
+                        let mut w = mapping.lock().await;
+                        if let Some(tx) = (*w).get(&uuid) {
+                            if tx.send(Message::new(instant, datas)).await.is_err() {
+                                warn!("Pinger({}) already closed.", addr);
+                                (*w).remove(&uuid);
+                            }
+                        }
                     }
                 }
+            }
+            _ = shutdown_rx.recv() => {
+                break;
             }
         }
     }

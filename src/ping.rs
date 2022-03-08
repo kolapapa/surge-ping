@@ -7,8 +7,12 @@ use std::{
 
 use parking_lot::Mutex;
 use rand::random;
-use tokio::{sync::mpsc, task, time::timeout};
-use tracing::error;
+use tokio::{
+    sync::{broadcast, mpsc, Mutex as TokioMutex},
+    task,
+    time::timeout,
+};
+use tracing::{error, warn};
 use uuid::Uuid;
 
 use crate::client::{AsyncSocket, Message};
@@ -48,6 +52,15 @@ pub struct Pinger {
     rx: mpsc::Receiver<Message>,
     cache: Cache,
     key: Uuid,
+    clear_tx: broadcast::Sender<()>,
+}
+
+impl Drop for Pinger {
+    fn drop(&mut self) {
+        if self.clear_tx.send(()).is_err() {
+            warn!("Clear Pinger cache failed");
+        }
+    }
 }
 
 impl Pinger {
@@ -56,7 +69,10 @@ impl Pinger {
         socket: AsyncSocket,
         rx: mpsc::Receiver<Message>,
         key: Uuid,
+        mapping: Arc<TokioMutex<HashMap<Uuid, mpsc::Sender<Message>>>>,
     ) -> Pinger {
+        let (clear_tx, _) = broadcast::channel(1);
+        task::spawn(clear_mapping_key(key, mapping, clear_tx.subscribe()));
         Pinger {
             destination: host,
             ident: random(),
@@ -66,6 +82,7 @@ impl Pinger {
             rx,
             cache: Cache::new(),
             key,
+            clear_tx,
         }
     }
 
@@ -148,5 +165,15 @@ impl Pinger {
                 Err(SurgeError::Timeout { seq: seq_cnt })
             }
         }
+    }
+}
+
+async fn clear_mapping_key(
+    key: Uuid,
+    mapping: Arc<TokioMutex<HashMap<Uuid, mpsc::Sender<Message>>>>,
+    mut rx: broadcast::Receiver<()>,
+) {
+    if rx.recv().await.is_ok() {
+        mapping.lock().await.remove(&key);
     }
 }
