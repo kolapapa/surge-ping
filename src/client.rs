@@ -82,7 +82,7 @@ impl AsyncSocket {
 }
 
 ///
-/// `Client` is a type wrapped by `Arc`, so you can `clone` arbitrarily cheaply,
+/// If you want to pass the `Client` in the task, please wrap it with `Arc`: `Arc<Client>`.
 /// and can realize the simultaneous ping of multiple addresses when only one `socket` is created.
 ///
 #[derive(Clone)]
