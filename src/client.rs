@@ -168,6 +168,11 @@ fn gen_uuid_with_payload(addr: IpAddr, datas: &[u8]) -> Option<Uuid> {
             if let Some(ip_packet) = ipv4::Ipv4Packet::new(datas) {
                 if let Some(icmp_packet) = icmp::IcmpPacket::new(ip_packet.payload()) {
                     let payload = icmp_packet.payload();
+
+                    if payload.len() < 20 {
+                        return None;
+                    }
+
                     let uuid = &payload[4..20];
                     return Uuid::from_slice(uuid).ok();
                 }
@@ -177,6 +182,11 @@ fn gen_uuid_with_payload(addr: IpAddr, datas: &[u8]) -> Option<Uuid> {
             if let Some(ipv6_packet) = ipv6::Ipv6Packet::new(datas) {
                 if let Some(icmpv6_packet) = icmpv6::Icmpv6Packet::new(ipv6_packet.payload()) {
                     let payload = icmpv6_packet.payload();
+
+                    if payload.len() < 20 {
+                        return None;
+                    }
+
                     let uuid = &payload[4..20];
                     return Uuid::from_slice(uuid).ok();
                 }
