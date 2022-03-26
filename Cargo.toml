@@ -1,6 +1,6 @@
 [package]
 name = "surge-ping"
-version = "0.5.1"
+version = "0.5.2"
 authors = ["kolapapa <kolapapa2021@gmail.com>"]
 edition = "2018"
 license = "MIT"
@@ -17,7 +17,7 @@ rand = "0.8.5"
 socket2 = { version = "0.4.4", features = ["all"] }
 thiserror = "1.0.30"
 tokio = { version = "1.17.0", features = ["time", "macros"] }
-tracing = "0.1.31"
+tracing = "0.1.32"
 uuid = { version = "0.8.2", features = ["v4"] }
 
 [dev-dependencies]
