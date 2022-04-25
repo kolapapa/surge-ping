@@ -5,6 +5,7 @@ use std::os::windows::io::{FromRawSocket, IntoRawSocket};
 
 use std::{
     collections::HashMap,
+    convert::TryInto,
     io,
     net::{IpAddr, SocketAddr},
     sync::Arc,
@@ -12,14 +13,14 @@ use std::{
 };
 
 use pnet_packet::{icmp, icmpv6, ipv4, ipv6, Packet};
+use rand::random;
 use socket2::{Domain, Protocol, Socket, Type};
 use tokio::{
     net::UdpSocket,
-    sync::{broadcast, mpsc, Mutex},
-    task,
+    sync::{mpsc, Mutex},
+    task::{self, JoinHandle},
 };
 use tracing::warn;
-use uuid::Uuid;
 
 use crate::{config::Config, Pinger, ICMP};
 
@@ -81,6 +82,8 @@ impl AsyncSocket {
     }
 }
 
+pub(crate) type UniqueId = [u8; 16];
+pub(crate) type ClientMapping = Arc<Mutex<HashMap<UniqueId, mpsc::Sender<Message>>>>;
 ///
 /// If you want to pass the `Client` in the task, please wrap it with `Arc`: `Arc<Client>`.
 /// and can realize the simultaneous ping of multiple addresses when only one `socket` is created.
@@ -88,14 +91,15 @@ impl AsyncSocket {
 #[derive(Clone)]
 pub struct Client {
     socket: AsyncSocket,
-    mapping: Arc<Mutex<HashMap<Uuid, mpsc::Sender<Message>>>>,
-    shutdown_tx: broadcast::Sender<()>,
+    mapping: ClientMapping,
+    recv: Arc<JoinHandle<()>>,
 }
 
 impl Drop for Client {
     fn drop(&mut self) {
-        if self.shutdown_tx.send(()).is_err() {
-            warn!("Client shutdown error.");
+        // The client may pass through multiple tasks, so need to judge whether the number of references is 1.
+        if Arc::strong_count(&self.recv) <= 1 {
+            self.recv.abort();
         }
     }
 }
@@ -106,24 +110,19 @@ impl Client {
     pub async fn new(config: &Config) -> io::Result<Self> {
         let socket = AsyncSocket::new(config)?;
         let mapping = Arc::new(Mutex::new(HashMap::new()));
-        let (shutdown_tx, _) = broadcast::channel(1);
-        task::spawn(recv_task(
-            socket.clone(),
-            mapping.clone(),
-            shutdown_tx.subscribe(),
-        ));
+        let recv = task::spawn(recv_task(socket.clone(), mapping.clone()));
 
         Ok(Self {
             socket,
             mapping,
-            shutdown_tx,
+            recv: Arc::new(recv),
         })
     }
 
     /// Create a `Pinger` instance, you can make special configuration for this instance. Such as `timeout`, `size` etc.
     pub async fn pinger(&self, host: IpAddr) -> Pinger {
         let (tx, rx) = mpsc::channel(10);
-        let key = Uuid::new_v4();
+        let key: UniqueId = random();
         {
             self.mapping.lock().await.insert(key, tx);
         }
@@ -131,38 +130,27 @@ impl Client {
     }
 }
 
-async fn recv_task(
-    socket: AsyncSocket,
-    mapping: Arc<Mutex<HashMap<Uuid, mpsc::Sender<Message>>>>,
-    mut shutdown_rx: broadcast::Receiver<()>,
-) {
+async fn recv_task(socket: AsyncSocket, mapping: ClientMapping) {
     let mut buf = [0; 2048];
 
     loop {
-        tokio::select! {
-            response = socket.recv_from(&mut buf) => {
-                if let Ok((sz, addr)) = response {
-                    let datas = buf[0..sz].to_vec();
-                    if let Some(uuid) = gen_uuid_with_payload(addr.ip(), datas.as_slice()) {
-                        let instant = Instant::now();
-                        let mut w = mapping.lock().await;
-                        if let Some(tx) = (*w).get(&uuid) {
-                            if tx.send(Message::new(instant, datas)).await.is_err() {
-                                warn!("Pinger({}) already closed.", addr);
-                                (*w).remove(&uuid);
-                            }
-                        }
+        if let Ok((sz, addr)) = socket.recv_from(&mut buf).await {
+            let datas = buf[0..sz].to_vec();
+            if let Some(uid) = gen_uid_with_payload(addr.ip(), datas.as_slice()) {
+                let instant = Instant::now();
+                let mut w = mapping.lock().await;
+                if let Some(tx) = (*w).get(&uid) {
+                    if tx.send(Message::new(instant, datas)).await.is_err() {
+                        warn!("Pinger({}) already closed.", addr);
+                        (*w).remove(&uid);
                     }
                 }
-            }
-            _ = shutdown_rx.recv() => {
-                break;
             }
         }
     }
 }
 
-fn gen_uuid_with_payload(addr: IpAddr, datas: &[u8]) -> Option<Uuid> {
+fn gen_uid_with_payload(addr: IpAddr, datas: &[u8]) -> Option<UniqueId> {
     match addr {
         IpAddr::V4(_) => {
             if let Some(ip_packet) = ipv4::Ipv4Packet::new(datas) {
@@ -173,8 +161,8 @@ fn gen_uuid_with_payload(addr: IpAddr, datas: &[u8]) -> Option<Uuid> {
                         return None;
                     }
 
-                    let uuid = &payload[4..20];
-                    return Uuid::from_slice(uuid).ok();
+                    let uid = &payload[4..20];
+                    return uid.try_into().ok();
                 }
             }
         }
@@ -187,8 +175,8 @@ fn gen_uuid_with_payload(addr: IpAddr, datas: &[u8]) -> Option<Uuid> {
                         return None;
                     }
 
-                    let uuid = &payload[4..20];
-                    return Uuid::from_slice(uuid).ok();
+                    let uid = &payload[4..20];
+                    return uid.try_into().ok();
                 }
             }
         }
