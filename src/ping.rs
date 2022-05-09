@@ -12,7 +12,7 @@ use tokio::{
     task,
     time::timeout,
 };
-use tracing::{error, warn};
+use tracing::warn;
 use uuid::Uuid;
 
 use crate::client::{AsyncSocket, Message};
@@ -147,13 +147,9 @@ impl Pinger {
         // let mut packet = EchoRequest::new(self.host, self.ident, seq_cnt, self.size).encode()?;
         let sock_addr = SocketAddr::new(self.destination, 0);
         let ident = self.ident;
-        let cache = self.cache.clone();
-        task::spawn(async move {
-            if let Err(e) = sender.send_to(&mut packet, &sock_addr).await {
-                error!("socket send packet error: {}", e)
-            }
-            cache.insert(ident, seq_cnt, Instant::now());
-        });
+
+        sender.send_to(&mut packet, &sock_addr).await?;
+        self.cache.insert(ident, seq_cnt, Instant::now());
 
         match timeout(self.timeout, self.recv_reply(seq_cnt)).await {
             Ok(reply) => reply.map_err(|err| {
