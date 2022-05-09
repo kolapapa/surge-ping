@@ -103,7 +103,7 @@ impl Drop for Client {
 impl Client {
     /// A client is generated according to the configuration. In fact, a `AsyncSocket` is wrapped inside,
     /// and you can clone to any `task` at will.
-    pub async fn new(config: &Config) -> io::Result<Self> {
+    pub fn new(config: &Config) -> io::Result<Self> {
         let socket = AsyncSocket::new(config)?;
         let mapping = Arc::new(Mutex::new(HashMap::new()));
         let (shutdown_tx, _) = broadcast::channel(1);
