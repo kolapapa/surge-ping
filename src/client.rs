@@ -12,7 +12,7 @@ use std::{
     time::Instant,
 };
 
-use pnet_packet::{icmp, icmpv6, ipv4, ipv6, Packet};
+use pnet_packet::{icmp, icmpv6, ipv4, Packet};
 use rand::random;
 use socket2::{Domain, Protocol, Socket, Type};
 use tokio::{
@@ -107,7 +107,7 @@ impl Drop for Client {
 impl Client {
     /// A client is generated according to the configuration. In fact, a `AsyncSocket` is wrapped inside,
     /// and you can clone to any `task` at will.
-    pub async fn new(config: &Config) -> io::Result<Self> {
+    pub fn new(config: &Config) -> io::Result<Self> {
         let socket = AsyncSocket::new(config)?;
         let mapping = Arc::new(Mutex::new(HashMap::new()));
         let recv = task::spawn(recv_task(socket.clone(), mapping.clone()));
@@ -167,17 +167,15 @@ fn gen_uid_with_payload(addr: IpAddr, datas: &[u8]) -> Option<UniqueId> {
             }
         }
         IpAddr::V6(_) => {
-            if let Some(ipv6_packet) = ipv6::Ipv6Packet::new(datas) {
-                if let Some(icmpv6_packet) = icmpv6::Icmpv6Packet::new(ipv6_packet.payload()) {
-                    let payload = icmpv6_packet.payload();
+            if let Some(icmpv6_packet) = icmpv6::Icmpv6Packet::new(datas) {
+                let payload = icmpv6_packet.payload();
 
-                    if payload.len() < 20 {
-                        return None;
-                    }
-
-                    let uid = &payload[4..20];
-                    return uid.try_into().ok();
+                if payload.len() < 20 {
+                    return None;
                 }
+
+                let uid = &payload[4..20];
+                return uid.try_into().ok();
             }
         }
     }

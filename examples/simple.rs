@@ -44,7 +44,7 @@ async fn main() {
     }
     let config = config_builder.build();
 
-    let client = Client::new(&config).await.unwrap();
+    let client = Client::new(&config).unwrap();
     let mut pinger = client.pinger(ip).await;
     pinger
         .ident(111)

@@ -17,8 +17,8 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "2a02:930::ff76",
         "114.114.114.114",
     ];
-    let client_v4 = Client::new(&Config::default()).await?;
-    let client_v6 = Client::new(&Config::builder().kind(ICMP::V6).build()).await?;
+    let client_v4 = Client::new(&Config::default())?;
+    let client_v6 = Client::new(&Config::builder().kind(ICMP::V6).build())?;
     let mut tasks = Vec::new();
     for ip in &ips {
         match ip.parse() {
