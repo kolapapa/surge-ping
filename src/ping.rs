@@ -8,14 +8,13 @@ use std::{
 use parking_lot::Mutex;
 use rand::random;
 use tokio::{
-    sync::{broadcast, mpsc, Mutex as TokioMutex},
+    sync::{broadcast, mpsc},
     task,
     time::timeout,
 };
 use tracing::warn;
-use uuid::Uuid;
 
-use crate::client::{AsyncSocket, Message};
+use crate::client::{AsyncSocket, ClientMapping, Message, UniqueId};
 use crate::error::{Result, SurgeError};
 use crate::icmp::{icmpv4, icmpv6, IcmpPacket};
 
@@ -51,7 +50,7 @@ pub struct Pinger {
     socket: AsyncSocket,
     rx: mpsc::Receiver<Message>,
     cache: Cache,
-    key: Uuid,
+    key: UniqueId,
     clear_tx: broadcast::Sender<()>,
 }
 
@@ -68,8 +67,8 @@ impl Pinger {
         host: IpAddr,
         socket: AsyncSocket,
         rx: mpsc::Receiver<Message>,
-        key: Uuid,
-        mapping: Arc<TokioMutex<HashMap<Uuid, mpsc::Sender<Message>>>>,
+        key: UniqueId,
+        mapping: ClientMapping,
     ) -> Pinger {
         let (clear_tx, _) = broadcast::channel(1);
         task::spawn(clear_mapping_key(key, mapping, clear_tx.subscribe()));
@@ -131,18 +130,12 @@ impl Pinger {
     pub async fn ping(&mut self, seq_cnt: u16) -> Result<(IcmpPacket, Duration)> {
         let sender = self.socket.clone();
         let mut packet = match self.destination {
-            IpAddr::V4(_) => icmpv4::make_icmpv4_echo_packet(
-                self.ident,
-                seq_cnt,
-                self.size,
-                self.key.as_bytes(),
-            )?,
-            IpAddr::V6(_) => icmpv6::make_icmpv6_echo_packet(
-                self.ident,
-                seq_cnt,
-                self.size,
-                self.key.as_bytes(),
-            )?,
+            IpAddr::V4(_) => {
+                icmpv4::make_icmpv4_echo_packet(self.ident, seq_cnt, self.size, &self.key)?
+            }
+            IpAddr::V6(_) => {
+                icmpv6::make_icmpv6_echo_packet(self.ident, seq_cnt, self.size, &self.key)?
+            }
         };
         // let mut packet = EchoRequest::new(self.host, self.ident, seq_cnt, self.size).encode()?;
         let sock_addr = SocketAddr::new(self.destination, 0);
@@ -164,11 +157,7 @@ impl Pinger {
     }
 }
 
-async fn clear_mapping_key(
-    key: Uuid,
-    mapping: Arc<TokioMutex<HashMap<Uuid, mpsc::Sender<Message>>>>,
-    mut rx: broadcast::Receiver<()>,
-) {
+async fn clear_mapping_key(key: UniqueId, mapping: ClientMapping, mut rx: broadcast::Receiver<()>) {
     if rx.recv().await.is_ok() {
         mapping.lock().await.remove(&key);
     }
