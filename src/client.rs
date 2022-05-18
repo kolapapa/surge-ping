@@ -11,7 +11,7 @@ use std::{
     time::Instant,
 };
 
-use pnet_packet::{icmp, icmpv6, ipv4, ipv6, Packet};
+use pnet_packet::{icmp, icmpv6, ipv4, Packet};
 use socket2::{Domain, Protocol, Socket, Type};
 use tokio::{
     net::UdpSocket,
@@ -179,17 +179,15 @@ fn gen_uuid_with_payload(addr: IpAddr, datas: &[u8]) -> Option<Uuid> {
             }
         }
         IpAddr::V6(_) => {
-            if let Some(ipv6_packet) = ipv6::Ipv6Packet::new(datas) {
-                if let Some(icmpv6_packet) = icmpv6::Icmpv6Packet::new(ipv6_packet.payload()) {
-                    let payload = icmpv6_packet.payload();
+            if let Some(icmpv6_packet) = icmpv6::Icmpv6Packet::new(datas) {
+                let payload = icmpv6_packet.payload();
 
-                    if payload.len() < 20 {
-                        return None;
-                    }
-
-                    let uuid = &payload[4..20];
-                    return Uuid::from_slice(uuid).ok();
+                if payload.len() < 20 {
+                    return None;
                 }
+
+                let uuid = &payload[4..20];
+                return Uuid::from_slice(uuid).ok();
             }
         }
     }
