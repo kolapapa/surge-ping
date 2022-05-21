@@ -2,7 +2,7 @@ use std::net::IpAddr;
 use std::time::Duration;
 
 use futures::future::join_all;
-use surge_ping::{Client, Config, IcmpPacket, ICMP};
+use surge_ping::{Client, Config, IcmpPacket, PingSequence, ICMP};
 use tokio::time;
 
 #[tokio::main]
@@ -42,7 +42,7 @@ async fn ping(client: Client, addr: IpAddr) {
     let mut interval = time::interval(Duration::from_secs(1));
     for idx in 0..5 {
         interval.tick().await;
-        match pinger.ping(idx).await {
+        match pinger.ping(PingSequence(idx)).await {
             Ok((IcmpPacket::V4(packet), dur)) => println!(
                 "No.{}: {} bytes from {}: icmp_seq={} ttl={} time={:0.2?}",
                 idx,

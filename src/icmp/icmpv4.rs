@@ -7,9 +7,11 @@ use pnet_packet::{ipv4, PacketSize};
 
 use crate::error::{MalformedPacketError, Result, SurgeError};
 
+use super::{PingIdentifier, PingSequence};
+
 pub fn make_icmpv4_echo_packet(
-    ident: u16,
-    seq_cnt: u16,
+    ident: PingIdentifier,
+    seq_cnt: PingSequence,
     size: usize,
     key: &[u8],
 ) -> Result<Vec<u8>> {
@@ -17,8 +19,8 @@ pub fn make_icmpv4_echo_packet(
     let mut packet = icmp::echo_request::MutableEchoRequestPacket::new(&mut buf[..])
         .ok_or(SurgeError::IncorrectBufferSize)?;
     packet.set_icmp_type(icmp::IcmpTypes::EchoRequest);
-    packet.set_identifier(ident);
-    packet.set_sequence_number(seq_cnt);
+    packet.set_identifier(ident.into_u16());
+    packet.set_sequence_number(seq_cnt.into_u16());
     packet.set_payload(key);
 
     // Calculate and set the checksum
@@ -40,8 +42,8 @@ pub struct Icmpv4Packet {
     icmp_code: IcmpCode,
     size: usize,
     real_dest: Ipv4Addr,
-    identifier: u16,
-    sequence: u16,
+    identifier: PingIdentifier,
+    sequence: PingSequence,
 }
 
 impl Default for Icmpv4Packet {
@@ -54,8 +56,8 @@ impl Default for Icmpv4Packet {
             icmp_code: IcmpCode::new(0),
             size: 0,
             real_dest: Ipv4Addr::new(127, 0, 0, 1),
-            identifier: 0,
-            sequence: 0,
+            identifier: PingIdentifier(0),
+            sequence: PingSequence(0),
         }
     }
 }
@@ -132,23 +134,23 @@ impl Icmpv4Packet {
         self.real_dest
     }
 
-    fn identifier(&mut self, identifier: u16) -> &mut Self {
+    fn identifier(&mut self, identifier: PingIdentifier) -> &mut Self {
         self.identifier = identifier;
         self
     }
 
     /// Get the identifier of the icmp_v4 packet.
-    pub fn get_identifier(&self) -> u16 {
+    pub fn get_identifier(&self) -> PingIdentifier {
         self.identifier
     }
 
-    fn sequence(&mut self, sequence: u16) -> &mut Self {
+    fn sequence(&mut self, sequence: PingSequence) -> &mut Self {
         self.sequence = sequence;
         self
     }
 
     /// Get the sequence of the icmp_v4 packet.
-    pub fn get_sequence(&self) -> u16 {
+    pub fn get_sequence(&self) -> PingSequence {
         self.sequence
     }
 
@@ -172,8 +174,8 @@ impl Icmpv4Packet {
                     .icmp_code(icmp_packet.get_icmp_code())
                     .size(icmp_packet.packet().len())
                     .real_dest(ipv4_packet.get_source())
-                    .identifier(icmp_packet.get_identifier())
-                    .sequence(icmp_packet.get_sequence_number());
+                    .identifier(icmp_packet.get_identifier().into())
+                    .sequence(icmp_packet.get_sequence_number().into());
                 Ok(packet)
             }
             icmp::IcmpTypes::EchoRequest => Err(SurgeError::EchoRequestPacket),
@@ -193,8 +195,8 @@ impl Icmpv4Packet {
                     .icmp_code(icmp_packet.get_icmp_code())
                     .size(icmp_packet.packet_size())
                     .real_dest(real_ip_packet.get_destination())
-                    .identifier(identifier)
-                    .sequence(sequence);
+                    .identifier(identifier.into())
+                    .sequence(sequence.into());
                 Ok(packet)
             }
         }

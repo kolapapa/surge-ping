@@ -7,10 +7,12 @@ use pnet_packet::PacketSize;
 
 use crate::error::{MalformedPacketError, Result, SurgeError};
 
+use super::{PingIdentifier, PingSequence};
+
 #[allow(dead_code)]
 pub fn make_icmpv6_echo_packet(
-    ident: u16,
-    seq_cnt: u16,
+    ident: PingIdentifier,
+    seq_cnt: PingSequence,
     size: usize,
     key: &[u8],
 ) -> Result<Vec<u8>> {
@@ -18,8 +20,8 @@ pub fn make_icmpv6_echo_packet(
     let mut packet = icmpv6::echo_request::MutableEchoRequestPacket::new(&mut buf[..])
         .ok_or(SurgeError::IncorrectBufferSize)?;
     packet.set_icmpv6_type(icmpv6::Icmpv6Types::EchoRequest);
-    packet.set_identifier(ident);
-    packet.set_sequence_number(seq_cnt);
+    packet.set_identifier(ident.into_u16());
+    packet.set_sequence_number(seq_cnt.into_u16());
     packet.set_payload(key);
 
     // Per https://tools.ietf.org/html/rfc3542#section-3.1 the checksum is
@@ -38,8 +40,8 @@ pub struct Icmpv6Packet {
     icmpv6_code: Icmpv6Code,
     size: usize,
     real_dest: Ipv6Addr,
-    identifier: u16,
-    sequence: u16,
+    identifier: PingIdentifier,
+    sequence: PingSequence,
 }
 
 impl Default for Icmpv6Packet {
@@ -52,8 +54,8 @@ impl Default for Icmpv6Packet {
             icmpv6_code: Icmpv6Code::new(0),
             size: 0,
             real_dest: Ipv6Addr::LOCALHOST,
-            identifier: 0,
-            sequence: 0,
+            identifier: PingIdentifier(0),
+            sequence: PingSequence(0),
         }
     }
 }
@@ -130,23 +132,23 @@ impl Icmpv6Packet {
         self.real_dest
     }
 
-    fn identifier(&mut self, identifier: u16) -> &mut Self {
+    fn identifier(&mut self, identifier: PingIdentifier) -> &mut Self {
         self.identifier = identifier;
         self
     }
 
     /// Get the identifier of the icmp_v6 packet.
-    pub fn get_identifier(&self) -> u16 {
+    pub fn get_identifier(&self) -> PingIdentifier {
         self.identifier
     }
 
-    fn sequence(&mut self, sequence: u16) -> &mut Self {
+    fn sequence(&mut self, sequence: PingSequence) -> &mut Self {
         self.sequence = sequence;
         self
     }
 
     /// Get the sequence of the icmp_v6 packet.
-    pub fn get_sequence(&self) -> u16 {
+    pub fn get_sequence(&self) -> PingSequence {
         self.sequence
     }
 
@@ -170,8 +172,8 @@ impl Icmpv6Packet {
                     .icmpv6_code(icmpv6_packet.get_icmpv6_code())
                     .size(icmpv6_packet.packet().len())
                     .real_dest(destination)
-                    .identifier(identifier)
-                    .sequence(sequence);
+                    .identifier(identifier.into())
+                    .sequence(sequence.into());
                 Ok(packet)
             }
             _ => {
@@ -186,8 +188,8 @@ impl Icmpv6Packet {
                     .icmpv6_type(icmpv6_packet.get_icmpv6_type())
                     .icmpv6_code(icmpv6_packet.get_icmpv6_code())
                     .size(icmpv6_packet.packet_size())
-                    .identifier(identifier)
-                    .sequence(sequence);
+                    .identifier(identifier.into())
+                    .sequence(sequence.into());
                 Ok(packet)
             }
         }

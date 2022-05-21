@@ -3,6 +3,8 @@ use std::io;
 
 use thiserror::Error;
 
+use crate::icmp::PingSequence;
+
 pub type Result<T> = std::result::Result<T, SurgeError>;
 
 /// An error resulting from a ping option-setting or send/receive operation.
@@ -16,7 +18,7 @@ pub enum SurgeError {
     #[error("io error")]
     IOError(#[from] io::Error),
     #[error("Request timeout for icmp_seq {seq}")]
-    Timeout { seq: u16 },
+    Timeout { seq: PingSequence },
     #[error("Echo Request packet.")]
     EchoRequestPacket,
     #[error("Network error.")]

@@ -9,7 +9,9 @@ use std::{net::IpAddr, time::Duration};
 pub use client::Client;
 pub use config::{Config, ConfigBuilder};
 pub use error::SurgeError;
-pub use icmp::{icmpv4::Icmpv4Packet, icmpv6::Icmpv6Packet, IcmpPacket};
+pub use icmp::{
+    icmpv4::Icmpv4Packet, icmpv6::Icmpv6Packet, IcmpPacket, PingIdentifier, PingSequence,
+};
 pub use ping::Pinger;
 
 #[derive(Debug, Clone, Copy)]
@@ -51,5 +53,5 @@ pub async fn ping(host: IpAddr) -> Result<(IcmpPacket, Duration), SurgeError> {
     };
     let client = Client::new(&config)?;
     let mut pinger = client.pinger(host).await;
-    pinger.ping(0).await
+    pinger.ping(PingSequence(0)).await
 }

@@ -14,11 +14,17 @@ use tokio::{
 };
 use tracing::warn;
 
-use crate::client::{AsyncSocket, ClientMapping, Message, UniqueId};
-use crate::error::{Result, SurgeError};
 use crate::icmp::{icmpv4, icmpv6, IcmpPacket};
+use crate::{
+    client::{AsyncSocket, ClientMapping, Message, UniqueId},
+    icmp::PingSequence,
+};
+use crate::{
+    error::{Result, SurgeError},
+    icmp::PingIdentifier,
+};
 
-type Token = (u16, u16);
+type Token = (PingIdentifier, PingSequence);
 
 #[derive(Debug, Clone)]
 struct Cache {
@@ -32,11 +38,11 @@ impl Cache {
         }
     }
 
-    fn insert(&self, ident: u16, seq_cnt: u16, time: Instant) {
+    fn insert(&self, ident: PingIdentifier, seq_cnt: PingSequence, time: Instant) {
         self.inner.lock().insert((ident, seq_cnt), time);
     }
 
-    fn remove(&self, ident: u16, seq_cnt: u16) -> Option<Instant> {
+    fn remove(&self, ident: PingIdentifier, seq_cnt: PingSequence) -> Option<Instant> {
         self.inner.lock().remove(&(ident, seq_cnt))
     }
 }
@@ -44,7 +50,7 @@ impl Cache {
 /// A Ping struct represents the state of one particular ping instance.
 pub struct Pinger {
     pub destination: IpAddr,
-    pub ident: u16,
+    pub ident: PingIdentifier,
     pub size: usize,
     timeout: Duration,
     socket: AsyncSocket,
@@ -74,7 +80,7 @@ impl Pinger {
         task::spawn(clear_mapping_key(key, mapping, clear_tx.subscribe()));
         Pinger {
             destination: host,
-            ident: random(),
+            ident: PingIdentifier(random()),
             size: 56,
             timeout: Duration::from_secs(2),
             socket,
@@ -86,7 +92,7 @@ impl Pinger {
     }
 
     /// Set the identification of ICMP.
-    pub fn ident(&mut self, val: u16) -> &mut Pinger {
+    pub fn ident(&mut self, val: PingIdentifier) -> &mut Pinger {
         self.ident = val;
         self
     }
@@ -103,7 +109,7 @@ impl Pinger {
         self
     }
 
-    async fn recv_reply(&mut self, seq_cnt: u16) -> Result<(IcmpPacket, Duration)> {
+    async fn recv_reply(&mut self, seq_cnt: PingSequence) -> Result<(IcmpPacket, Duration)> {
         loop {
             let message = self.rx.recv().await.ok_or(SurgeError::NetworkError)?;
             let packet = match self.destination {
@@ -127,7 +133,7 @@ impl Pinger {
     }
 
     /// Send Ping request with sequence number.
-    pub async fn ping(&mut self, seq_cnt: u16) -> Result<(IcmpPacket, Duration)> {
+    pub async fn ping(&mut self, seq_cnt: PingSequence) -> Result<(IcmpPacket, Duration)> {
         let sender = self.socket.clone();
         let mut packet = match self.destination {
             IpAddr::V4(_) => {

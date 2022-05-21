@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use structopt::StructOpt;
-use surge_ping::{Client, Config, ICMP};
+use surge_ping::{Client, Config, PingIdentifier, PingSequence, ICMP};
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "surge-ping")]
@@ -47,10 +47,10 @@ async fn main() {
     let client = Client::new(&config).unwrap();
     let mut pinger = client.pinger(ip).await;
     pinger
-        .ident(111)
+        .ident(PingIdentifier(111))
         .size(opt.size)
         .timeout(Duration::from_secs(1));
-    match pinger.ping(0).await {
+    match pinger.ping(PingSequence(0)).await {
         Ok((packet, rtt)) => {
             println!("{:?} {:0.2?}", packet, rtt);
         }
