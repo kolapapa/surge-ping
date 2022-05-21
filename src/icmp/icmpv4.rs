@@ -12,16 +12,15 @@ use super::{PingIdentifier, PingSequence};
 pub fn make_icmpv4_echo_packet(
     ident: PingIdentifier,
     seq_cnt: PingSequence,
-    size: usize,
-    key: &[u8],
+    payload: &[u8],
 ) -> Result<Vec<u8>> {
-    let mut buf = vec![0; 8 + size]; // 8 bytes of header, then payload
+    let mut buf = vec![0; 8 + payload.len()]; // 8 bytes of header, then payload
     let mut packet = icmp::echo_request::MutableEchoRequestPacket::new(&mut buf[..])
         .ok_or(SurgeError::IncorrectBufferSize)?;
     packet.set_icmp_type(icmp::IcmpTypes::EchoRequest);
     packet.set_identifier(ident.into_u16());
     packet.set_sequence_number(seq_cnt.into_u16());
-    packet.set_payload(key);
+    packet.set_payload(payload);
 
     // Calculate and set the checksum
     let icmp_packet =

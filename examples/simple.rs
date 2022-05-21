@@ -44,13 +44,11 @@ async fn main() {
     }
     let config = config_builder.build();
 
+    let payload = vec![0; opt.size];
     let client = Client::new(&config).unwrap();
-    let mut pinger = client.pinger(ip).await;
-    pinger
-        .ident(PingIdentifier(111))
-        .size(opt.size)
-        .timeout(Duration::from_secs(1));
-    match pinger.ping(PingSequence(0)).await {
+    let mut pinger = client.pinger(ip, PingIdentifier(111)).await;
+    pinger.timeout(Duration::from_secs(1));
+    match pinger.ping(PingSequence(0), &payload).await {
         Ok((packet, rtt)) => {
             println!("{:?} {:0.2?}", packet, rtt);
         }

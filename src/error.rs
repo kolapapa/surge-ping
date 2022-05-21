@@ -1,9 +1,9 @@
 #![allow(dead_code)]
-use std::io;
+use std::{io, net::IpAddr};
 
 use thiserror::Error;
 
-use crate::icmp::PingSequence;
+use crate::{icmp::PingSequence, PingIdentifier};
 
 pub type Result<T> = std::result::Result<T, SurgeError>;
 
@@ -23,6 +23,12 @@ pub enum SurgeError {
     EchoRequestPacket,
     #[error("Network error.")]
     NetworkError,
+    #[error("Multiple identical request")]
+    IdenticalRequests {
+        host: IpAddr,
+        ident: PingIdentifier,
+        seq: PingSequence,
+    },
 }
 
 #[derive(Error, Debug)]

@@ -2,7 +2,8 @@ use std::net::IpAddr;
 use std::time::Duration;
 
 use futures::future::join_all;
-use surge_ping::{Client, Config, IcmpPacket, PingSequence, ICMP};
+use rand::random;
+use surge_ping::{Client, Config, IcmpPacket, PingIdentifier, PingSequence, ICMP};
 use tokio::time;
 
 #[tokio::main]
@@ -37,12 +38,13 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 // Ping an address 5 times， and print output message（interval 1s）
 async fn ping(client: Client, addr: IpAddr) {
-    let mut pinger = client.pinger(addr).await;
-    pinger.size(56).timeout(Duration::from_secs(1));
+    let payload = [0; 56];
+    let mut pinger = client.pinger(addr, PingIdentifier(random())).await;
+    pinger.timeout(Duration::from_secs(1));
     let mut interval = time::interval(Duration::from_secs(1));
     for idx in 0..5 {
         interval.tick().await;
-        match pinger.ping(PingSequence(idx)).await {
+        match pinger.ping(PingSequence(idx), &payload).await {
             Ok((IcmpPacket::V4(packet), dur)) => println!(
                 "No.{}: {} bytes from {}: icmp_seq={} ttl={} time={:0.2?}",
                 idx,
@@ -61,8 +63,8 @@ async fn ping(client: Client, addr: IpAddr) {
                 packet.get_max_hop_limit(),
                 dur
             ),
-            Err(e) => println!("No.{}: {} ping {}", idx, pinger.destination, e),
+            Err(e) => println!("No.{}: {} ping {}", idx, pinger.host, e),
         };
     }
-    println!("[+] {} done.", pinger.destination);
+    println!("[+] {} done.", pinger.host);
 }

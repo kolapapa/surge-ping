@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use structopt::StructOpt;
-use surge_ping::{Client, Config, IcmpPacket, PingSequence, ICMP};
+use surge_ping::{Client, Config, IcmpPacket, PingIdentifier, PingSequence, ICMP};
 use tokio::time;
 
 #[derive(Default, Debug)]
@@ -148,14 +148,14 @@ async fn main() {
     let config = config_builder.build();
 
     let client = Client::new(&config).unwrap();
-    let mut pinger = client.pinger(ip).await;
+    let mut pinger = client.pinger(ip, PingIdentifier(111)).await;
     pinger.timeout(Duration::from_secs(opt.timeout));
-
+    let payload = vec![0; opt.size];
     let mut answer = Answer::new(&opt.host);
     println!("PING {} ({}): {} data bytes", opt.host, ip, opt.size);
     for idx in 0..opt.count {
         interval.tick().await;
-        match pinger.ping(PingSequence(idx)).await {
+        match pinger.ping(PingSequence(idx), &payload).await {
             Ok((IcmpPacket::V4(reply), dur)) => {
                 println!(
                     "{} bytes from {}: icmp_seq={} ttl={} time={:0.3?}",

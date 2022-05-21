@@ -1,4 +1,4 @@
-use std::{fmt, net::IpAddr};
+use std::fmt;
 
 pub mod icmpv4;
 pub mod icmpv6;
@@ -13,22 +13,17 @@ pub enum IcmpPacket {
 }
 
 impl IcmpPacket {
-    /// Check reply Icmp packet is corret.
-    pub fn check_reply_packet(
-        &self,
-        destination: IpAddr,
-        seq_cnt: PingSequence,
-        identifier: PingIdentifier,
-    ) -> bool {
+    pub fn get_identifier(&self) -> PingIdentifier {
         match self {
-            IcmpPacket::V4(packet) => {
-                destination.eq(&IpAddr::V4(packet.get_real_dest()))
-                    && packet.get_sequence() == seq_cnt
-                    && packet.get_identifier() == identifier
-            }
-            IcmpPacket::V6(packet) => {
-                packet.get_sequence() == seq_cnt && packet.get_identifier() == identifier
-            }
+            IcmpPacket::V4(packet) => packet.get_identifier(),
+            IcmpPacket::V6(packet) => packet.get_identifier(),
+        }
+    }
+
+    pub fn get_sequence(&self) -> PingSequence {
+        match self {
+            IcmpPacket::V4(packet) => packet.get_sequence(),
+            IcmpPacket::V6(packet) => packet.get_sequence(),
         }
     }
 }

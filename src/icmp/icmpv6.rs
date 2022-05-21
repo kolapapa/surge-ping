@@ -13,16 +13,15 @@ use super::{PingIdentifier, PingSequence};
 pub fn make_icmpv6_echo_packet(
     ident: PingIdentifier,
     seq_cnt: PingSequence,
-    size: usize,
-    key: &[u8],
+    payload: &[u8],
 ) -> Result<Vec<u8>> {
-    let mut buf = vec![0; 8 + size]; // 8 bytes of header, then payload
+    let mut buf = vec![0; 8 + payload.len()]; // 8 bytes of header, then payload
     let mut packet = icmpv6::echo_request::MutableEchoRequestPacket::new(&mut buf[..])
         .ok_or(SurgeError::IncorrectBufferSize)?;
     packet.set_icmpv6_type(icmpv6::Icmpv6Types::EchoRequest);
     packet.set_identifier(ident.into_u16());
     packet.set_sequence_number(seq_cnt.into_u16());
-    packet.set_payload(key);
+    packet.set_payload(payload);
 
     // Per https://tools.ietf.org/html/rfc3542#section-3.1 the checksum is
     // omitted, the kernel will insert it.
