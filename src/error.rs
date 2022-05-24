@@ -15,7 +15,7 @@ pub enum SurgeError {
     IncorrectBufferSize,
     #[error("malformed packet: {0}")]
     MalformedPacket(#[from] MalformedPacketError),
-    #[error("io error")]
+    #[error("io error: {0}")]
     IOError(#[from] io::Error),
     #[error("Request timeout for icmp_seq {seq}")]
     Timeout { seq: PingSequence },
