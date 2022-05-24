@@ -1,7 +1,9 @@
 #![allow(dead_code)]
-use std::io;
+use std::{io, net::IpAddr};
 
 use thiserror::Error;
+
+use crate::{icmp::PingSequence, PingIdentifier};
 
 pub type Result<T> = std::result::Result<T, SurgeError>;
 
@@ -16,11 +18,17 @@ pub enum SurgeError {
     #[error("io error")]
     IOError(#[from] io::Error),
     #[error("Request timeout for icmp_seq {seq}")]
-    Timeout { seq: u16 },
+    Timeout { seq: PingSequence },
     #[error("Echo Request packet.")]
     EchoRequestPacket,
     #[error("Network error.")]
     NetworkError,
+    #[error("Multiple identical request")]
+    IdenticalRequests {
+        host: IpAddr,
+        ident: PingIdentifier,
+        seq: PingSequence,
+    },
 }
 
 #[derive(Error, Debug)]

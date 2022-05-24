@@ -9,8 +9,11 @@ use std::{net::IpAddr, time::Duration};
 pub use client::Client;
 pub use config::{Config, ConfigBuilder};
 pub use error::SurgeError;
-pub use icmp::{icmpv4::Icmpv4Packet, icmpv6::Icmpv6Packet, IcmpPacket};
+pub use icmp::{
+    icmpv4::Icmpv4Packet, icmpv6::Icmpv6Packet, IcmpPacket, PingIdentifier, PingSequence,
+};
 pub use ping::Pinger;
+use rand::random;
 
 #[derive(Debug, Clone, Copy)]
 pub enum ICMP {
@@ -32,7 +35,7 @@ impl Default for ICMP {
 /// # Examples
 ///
 /// ```rust
-/// match surge_ping::ping("127.0.0.1".parse()?).await {
+/// match surge_ping::ping("127.0.0.1".parse()?, &[1,2,3,4,5,6,7,8]).await {
 ///     Ok((_packet, duration)) => println!("duration: {:.2?}", duration),
 ///     Err(e) => println!("{:?}", e),
 /// };
@@ -44,12 +47,12 @@ impl Default for ICMP {
 ///
 /// - socket create failed
 ///
-pub async fn ping(host: IpAddr) -> Result<(IcmpPacket, Duration), SurgeError> {
+pub async fn ping(host: IpAddr, payload: &[u8]) -> Result<(IcmpPacket, Duration), SurgeError> {
     let config = match host {
         IpAddr::V4(_) => Config::default(),
         IpAddr::V6(_) => Config::builder().kind(ICMP::V6).build(),
     };
     let client = Client::new(&config)?;
-    let mut pinger = client.pinger(host).await;
-    pinger.ping(0).await
+    let mut pinger = client.pinger(host, PingIdentifier(random())).await;
+    pinger.ping(PingSequence(0), payload).await
 }

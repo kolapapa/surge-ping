@@ -5,35 +5,26 @@ use std::os::windows::io::{FromRawSocket, IntoRawSocket};
 
 use std::{
     collections::HashMap,
-    convert::TryInto,
     io,
     net::{IpAddr, SocketAddr},
     sync::Arc,
     time::Instant,
 };
 
-use pnet_packet::{icmp, icmpv6, ipv4, Packet};
-use rand::random;
+use parking_lot::Mutex;
 use socket2::{Domain, Protocol, Socket, Type};
 use tokio::{
     net::UdpSocket,
-    sync::{mpsc, Mutex},
+    sync::oneshot,
     task::{self, JoinHandle},
 };
-use tracing::warn;
+use tracing::debug;
 
-use crate::{config::Config, Pinger, ICMP};
-
-pub(crate) struct Message {
-    pub when: Instant,
-    pub packet: Vec<u8>,
-}
-
-impl Message {
-    pub(crate) fn new(when: Instant, packet: Vec<u8>) -> Self {
-        Self { when, packet }
-    }
-}
+use crate::{
+    config::Config,
+    icmp::{icmpv4::Icmpv4Packet, icmpv6::Icmpv6Packet},
+    IcmpPacket, PingIdentifier, PingSequence, Pinger, SurgeError, ICMP,
+};
 
 #[derive(Clone)]
 pub(crate) struct AsyncSocket {
@@ -82,8 +73,50 @@ impl AsyncSocket {
     }
 }
 
-pub(crate) type UniqueId = [u8; 16];
-pub(crate) type ClientMapping = Arc<Mutex<HashMap<UniqueId, mpsc::Sender<Message>>>>;
+#[derive(PartialEq, Eq, Hash)]
+struct ReplyToken(IpAddr, PingIdentifier, PingSequence);
+
+pub(crate) struct Reply {
+    pub timestamp: Instant,
+    pub packet: IcmpPacket,
+}
+
+#[derive(Clone, Default)]
+pub(crate) struct ReplyMap(Arc<Mutex<HashMap<ReplyToken, oneshot::Sender<Reply>>>>);
+
+impl ReplyMap {
+    /// Register to wait for a reply from host with ident and sequence number.
+    /// If there is already someone waiting for this specific reply then an
+    /// error is returned.
+    pub fn new_waiter(
+        &self,
+        host: IpAddr,
+        ident: PingIdentifier,
+        seq: PingSequence,
+    ) -> Result<oneshot::Receiver<Reply>, SurgeError> {
+        let (tx, rx) = oneshot::channel();
+        if self
+            .0
+            .lock()
+            .insert(ReplyToken(host, ident, seq), tx)
+            .is_some()
+        {
+            return Err(SurgeError::IdenticalRequests { host, ident, seq });
+        }
+        Ok(rx)
+    }
+
+    /// Remove a waiter.
+    pub(crate) fn remove(
+        &self,
+        host: IpAddr,
+        ident: PingIdentifier,
+        seq: PingSequence,
+    ) -> Option<oneshot::Sender<Reply>> {
+        self.0.lock().remove(&ReplyToken(host, ident, seq))
+    }
+}
+
 ///
 /// If you want to pass the `Client` in the task, please wrap it with `Arc`: `Arc<Client>`.
 /// and can realize the simultaneous ping of multiple addresses when only one `socket` is created.
@@ -91,7 +124,7 @@ pub(crate) type ClientMapping = Arc<Mutex<HashMap<UniqueId, mpsc::Sender<Message
 #[derive(Clone)]
 pub struct Client {
     socket: AsyncSocket,
-    mapping: ClientMapping,
+    reply_map: ReplyMap,
     recv: Arc<JoinHandle<()>>,
 }
 
@@ -109,75 +142,48 @@ impl Client {
     /// and you can clone to any `task` at will.
     pub fn new(config: &Config) -> io::Result<Self> {
         let socket = AsyncSocket::new(config)?;
-        let mapping = Arc::new(Mutex::new(HashMap::new()));
-        let recv = task::spawn(recv_task(socket.clone(), mapping.clone()));
-
+        let reply_map = ReplyMap::default();
+        let recv = task::spawn(recv_task(socket.clone(), reply_map.clone()));
         Ok(Self {
             socket,
-            mapping,
+            reply_map,
             recv: Arc::new(recv),
         })
     }
 
-    /// Create a `Pinger` instance, you can make special configuration for this instance. Such as `timeout`, `size` etc.
-    pub async fn pinger(&self, host: IpAddr) -> Pinger {
-        let (tx, rx) = mpsc::channel(10);
-        let key: UniqueId = random();
-        {
-            self.mapping.lock().await.insert(key, tx);
-        }
-        Pinger::new(host, self.socket.clone(), rx, key, self.mapping.clone())
+    /// Create a `Pinger` instance, you can make special configuration for this instance.
+    pub async fn pinger(&self, host: IpAddr, ident: PingIdentifier) -> Pinger {
+        Pinger::new(host, ident, self.socket.clone(), self.reply_map.clone())
     }
 }
 
-async fn recv_task(socket: AsyncSocket, mapping: ClientMapping) {
+async fn recv_task(socket: AsyncSocket, reply_map: ReplyMap) {
     let mut buf = [0; 2048];
-
     loop {
         if let Ok((sz, addr)) = socket.recv_from(&mut buf).await {
-            let datas = buf[0..sz].to_vec();
-            if let Some(uid) = gen_uid_with_payload(addr.ip(), datas.as_slice()) {
-                let instant = Instant::now();
-                let mut w = mapping.lock().await;
-                if let Some(tx) = (*w).get(&uid) {
-                    if tx.send(Message::new(instant, datas)).await.is_err() {
-                        warn!("Pinger({}) already closed.", addr);
-                        (*w).remove(&uid);
+            let timestamp = Instant::now();
+            let message = &buf[..sz];
+            let packet = {
+                let result = match addr.ip() {
+                    IpAddr::V4(_addr) => Icmpv4Packet::decode(message).map(IcmpPacket::V4),
+                    IpAddr::V6(addr) => Icmpv6Packet::decode(message, addr).map(IcmpPacket::V6),
+                };
+                match result {
+                    Ok(packet) => packet,
+                    Err(err) => {
+                        debug!("error decoding ICMP packet: {:?}", err);
+                        continue;
                     }
                 }
+            };
+            if let Some(waiter) =
+                reply_map.remove(addr.ip(), packet.get_identifier(), packet.get_sequence())
+            {
+                // If send fails the receiving end has closed. Nothing to do.
+                let _ = waiter.send(Reply { timestamp, packet });
+            } else {
+                debug!("no one is waiting for ICMP packet ({:?})", packet);
             }
         }
     }
-}
-
-fn gen_uid_with_payload(addr: IpAddr, datas: &[u8]) -> Option<UniqueId> {
-    match addr {
-        IpAddr::V4(_) => {
-            if let Some(ip_packet) = ipv4::Ipv4Packet::new(datas) {
-                if let Some(icmp_packet) = icmp::IcmpPacket::new(ip_packet.payload()) {
-                    let payload = icmp_packet.payload();
-
-                    if payload.len() < 20 {
-                        return None;
-                    }
-
-                    let uid = &payload[4..20];
-                    return uid.try_into().ok();
-                }
-            }
-        }
-        IpAddr::V6(_) => {
-            if let Some(icmpv6_packet) = icmpv6::Icmpv6Packet::new(datas) {
-                let payload = icmpv6_packet.payload();
-
-                if payload.len() < 20 {
-                    return None;
-                }
-
-                let uid = &payload[4..20];
-                return uid.try_into().ok();
-            }
-        }
-    }
-    None
 }
