@@ -14,6 +14,7 @@ categories = ["network-programming", "asynchronous"]
 parking_lot = "0.12.0"
 pnet_packet = "0.29.0"
 rand = "0.8.5"
+hex = "0.4.3"
 socket2 = { version = "0.4.4", features = ["all"] }
 thiserror = "1.0.30"
 tokio = { version = "1.17.0", features = ["time", "macros"] }

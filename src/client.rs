@@ -137,8 +137,9 @@ fn gen_uuid_with_payload(addr: IpAddr, datas: &[u8]) -> Option<Uuid> {
             if let Some(ip_packet) = ipv4::Ipv4Packet::new(datas) {
                 if let Some(icmp_packet) = icmp::IcmpPacket::new(ip_packet.payload()) {
                     let payload = icmp_packet.payload();
-                    let uuid = &payload[4..20];
-                    return Uuid::from_slice(uuid).ok();
+                    if let Some(uuid) = &payload.get(4..20) {
+                        return Uuid::from_slice(uuid).ok();
+                    }
                 }
             }
         }
@@ -146,11 +147,33 @@ fn gen_uuid_with_payload(addr: IpAddr, datas: &[u8]) -> Option<Uuid> {
             if let Some(ipv6_packet) = ipv6::Ipv6Packet::new(datas) {
                 if let Some(icmpv6_packet) = icmpv6::Icmpv6Packet::new(ipv6_packet.payload()) {
                     let payload = icmpv6_packet.payload();
-                    let uuid = &payload[4..20];
-                    return Uuid::from_slice(uuid).ok();
+                    if let Some(uuid) = &payload.get(4..20) {
+                        return Uuid::from_slice(uuid).ok();
+                    }
                 }
             }
         }
     }
     None
+}
+
+#[cfg(test)]
+mod tests {
+    use std::net::IpAddr;
+    use crate::client::gen_uuid_with_payload;
+    use std::str::FromStr;
+
+    #[test]
+    fn short_packet() {
+        let decoded = hex::decode("4500001d0000000079018a76acd90e6e0a00f22200006c3293cc000100").unwrap();
+
+        assert!(gen_uuid_with_payload(IpAddr::from_str("127.0.0.1").unwrap(), &decoded).is_none());
+    }
+
+    #[test]
+    fn standard_packet() {
+        let decoded = hex::decode("45000054000000007901067e8efab00e0a00f22200004176a1ee0001613dd762000000002127040000000000101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f3031323334353637").unwrap();
+
+        gen_uuid_with_payload(IpAddr::from_str("127.0.0.1").unwrap(), &decoded).unwrap();
+    }
 }
