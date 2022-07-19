@@ -11,6 +11,7 @@ keywords = ["tokio", "icmp", "ping"]
 categories = ["network-programming", "asynchronous"]
 
 [dependencies]
+hex = "0.4.3"
 parking_lot = "0.12.0"
 pnet_packet = "0.30"
 rand = "0.8.5"

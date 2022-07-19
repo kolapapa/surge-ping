@@ -160,8 +160,16 @@ impl Icmpv6Packet {
         match icmpv6_packet.get_icmpv6_type() {
             icmpv6::Icmpv6Types::EchoRequest => Err(SurgeError::EchoRequestPacket),
             icmpv6::Icmpv6Types::EchoReply => {
-                let identifier = u16::from_be_bytes(icmpv6_payload[0..2].try_into().unwrap());
-                let sequence = u16::from_be_bytes(icmpv6_payload[2..4].try_into().unwrap());
+                let identifier_payload = icmpv6_payload
+                    .get(0..2)
+                    .ok_or(MalformedPacketError::NotIcmpv6Packet)?;
+                let identifier = u16::from_be_bytes(identifier_payload.try_into().unwrap());
+
+                let sequence_payload = icmpv6_payload
+                    .get(2..4)
+                    .ok_or(MalformedPacketError::NotIcmpv6Packet)?;
+                let sequence = u16::from_be_bytes(sequence_payload.try_into().unwrap());
+
                 let mut packet = Icmpv6Packet::default();
                 packet
                     .source(destination)
@@ -177,8 +185,16 @@ impl Icmpv6Packet {
             }
             _ => {
                 // ipv6 header(40) + icmpv6 echo header(4)
-                let identifier = u16::from_be_bytes(icmpv6_payload[44..46].try_into().unwrap());
-                let sequence = u16::from_be_bytes(icmpv6_payload[46..48].try_into().unwrap());
+                let identifier_payload = icmpv6_payload
+                    .get(44..46)
+                    .ok_or(MalformedPacketError::NotIcmpv6Packet)?;
+                let identifier = u16::from_be_bytes(identifier_payload.try_into().unwrap());
+
+                let sequence_payload = icmpv6_payload
+                    .get(46..48)
+                    .ok_or(MalformedPacketError::NotIcmpv6Packet)?;
+                let sequence = u16::from_be_bytes(sequence_payload.try_into().unwrap());
+
                 let mut packet = Icmpv6Packet::default();
                 packet
                     .source(destination)

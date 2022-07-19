@@ -180,11 +180,24 @@ impl Icmpv4Packet {
             icmp::IcmpTypes::EchoRequest => Err(SurgeError::EchoRequestPacket),
             _ => {
                 let icmp_payload = icmp_packet.payload();
+
                 // icmp unused(4) + ip header(20) + echo icmp(4)
-                let real_ip_packet = ipv4::Ipv4Packet::new(&icmp_payload[4..])
-                    .ok_or_else(|| SurgeError::from(MalformedPacketError::NotIpv4Packet))?;
-                let identifier = u16::from_be_bytes(icmp_payload[28..30].try_into().unwrap());
-                let sequence = u16::from_be_bytes(icmp_payload[30..32].try_into().unwrap());
+                let stripped_payload = &icmp_payload
+                    .get(4..)
+                    .ok_or(MalformedPacketError::NotIcmpv4Packet)?;
+                let real_ip_packet = ipv4::Ipv4Packet::new(stripped_payload)
+                    .ok_or(MalformedPacketError::NotIpv4Packet)?;
+
+                let identifier_payload = icmp_payload
+                    .get(28..30)
+                    .ok_or(MalformedPacketError::NotIcmpv4Packet)?;
+                let identifier = u16::from_be_bytes(identifier_payload.try_into().unwrap());
+
+                let sequence_payload = icmp_payload
+                    .get(30..32)
+                    .ok_or(MalformedPacketError::NotIcmpv4Packet)?;
+                let sequence = u16::from_be_bytes(sequence_payload.try_into().unwrap());
+
                 let mut packet = Icmpv4Packet::default();
                 packet
                     .source(ipv4_packet.get_source())
@@ -199,5 +212,29 @@ impl Icmpv4Packet {
                 Ok(packet)
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::Icmpv4Packet;
+
+    #[test]
+    fn malformed_packet() {
+        let decoded = hex::decode("4500001d0000000079018a76acd90e6e0a00f22203006c3293cc").unwrap();
+        assert!(Icmpv4Packet::decode(&decoded).is_err());
+    }
+
+    #[test]
+    fn short_packet() {
+        let decoded =
+            hex::decode("4500001d0000000079018a76acd90e6e0a00f22203006c3293cc000100").unwrap();
+        assert!(Icmpv4Packet::decode(&decoded).is_err());
+    }
+
+    #[test]
+    fn standard_packet() {
+        let decoded = hex::decode("45000054000000007901067e8efab00e0a00f22203004176a1ee0001613dd762000000002127040000000000101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f3031323334353637").unwrap();
+        Icmpv4Packet::decode(&decoded).unwrap();
     }
 }
