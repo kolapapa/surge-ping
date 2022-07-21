@@ -181,23 +181,17 @@ impl Icmpv4Packet {
             _ => {
                 let icmp_payload = icmp_packet.payload();
 
+                if icmp_payload.len() < 32 {
+                    return Err(SurgeError::from(MalformedPacketError::PayloadTooShort {
+                        got: icmp_payload.len(),
+                        want: 32,
+                    }));
+                }
                 // icmp unused(4) + ip header(20) + echo icmp(4)
-                let stripped_payload = &icmp_payload
-                    .get(4..)
-                    .ok_or(MalformedPacketError::NotIcmpv4Packet)?;
-                let real_ip_packet = ipv4::Ipv4Packet::new(stripped_payload)
-                    .ok_or(MalformedPacketError::NotIpv4Packet)?;
-
-                let identifier_payload = icmp_payload
-                    .get(28..30)
-                    .ok_or(MalformedPacketError::NotIcmpv4Packet)?;
-                let identifier = u16::from_be_bytes(identifier_payload.try_into().unwrap());
-
-                let sequence_payload = icmp_payload
-                    .get(30..32)
-                    .ok_or(MalformedPacketError::NotIcmpv4Packet)?;
-                let sequence = u16::from_be_bytes(sequence_payload.try_into().unwrap());
-
+                let real_ip_packet = ipv4::Ipv4Packet::new(&icmp_payload[4..])
+                    .ok_or_else(|| SurgeError::from(MalformedPacketError::NotIpv4Packet))?;
+                let identifier = u16::from_be_bytes(icmp_payload[28..30].try_into().unwrap());
+                let sequence = u16::from_be_bytes(icmp_payload[30..32].try_into().unwrap());
                 let mut packet = Icmpv4Packet::default();
                 packet
                     .source(ipv4_packet.get_source())

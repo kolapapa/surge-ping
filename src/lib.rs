@@ -34,7 +34,7 @@ impl Default for ICMP {
 ///
 /// # Examples
 ///
-/// ```rust
+/// ```rust ignore
 /// match surge_ping::ping("127.0.0.1".parse()?, &[1,2,3,4,5,6,7,8]).await {
 ///     Ok((_packet, duration)) => println!("duration: {:.2?}", duration),
 ///     Err(e) => println!("{:?}", e),
