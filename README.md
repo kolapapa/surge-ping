@@ -39,6 +39,8 @@ async fn main() {
 multi address usage: [multi_ping.rs](https://github.com/kolapapa/surge-ping/blob/main/examples/multi_ping.rs)
 
 ### Ping(ICMP)
+> sending ping packets requires either running as `root` or setting a capability on your binary, at least on Linux. This is a restriction enforced by the system, not by this `crate`.
+
 
 There are three example programs that you can run on your own.
 
