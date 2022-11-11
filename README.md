@@ -19,7 +19,7 @@ simple usage:
 Cargo.toml
 
 [dependencies]
-surge-ping = "0.7.3"
+surge-ping = "last version"
 tokio = { version = "1.21.2", features = ["full"] }
 */
 
