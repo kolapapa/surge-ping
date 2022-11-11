@@ -15,33 +15,30 @@ rust ping libray based on `tokio` + `socket2` + `pnet_packet`.
 simple usage:
 
 ```rust
-use surge_ping::IcmpPacket;
+/*
+Cargo.toml
+
+[dependencies]
+surge-ping = "0.7.3"
+tokio = { version = "1.21.2", features = ["full"] }
+*/
 
 #[tokio::main]
-async fn main() {
-    match surge_ping::ping("127.0.0.1".parse().unwrap()).await {
-        Ok((IcmpPacket::V4(packet), duration)) => {
-            println!(
-                "{} bytes from {}: icmp_seq={} ttl={:?} time={:.2?}",
-                packet.get_size(),
-                packet.get_source(),
-                packet.get_sequence(),
-                packet.get_ttl(),
-                duration
-            );
-        }
-        Ok(_) => unreachable!(),
-        Err(e) => println!("{:?}", e),
-    };
+async fn main() -> Result<(), Box<dyn std::error::Error>> {
+    let payload = [0; 8];
+
+    let (_packet, duration) = surge_ping::ping("127.0.0.1".parse()?, &payload).await?;
+
+    println!("Ping took {:.3?}", duration);
+
+    Ok(())
 }
+
 ```
 
 multi address usage: [multi_ping.rs](https://github.com/kolapapa/surge-ping/blob/main/examples/multi_ping.rs)
 
 ### Ping(ICMP)
-> sending ping packets requires either running as `root` or setting a capability on your binary, at least on Linux. This is a restriction enforced by the system, not by this `crate`.
-
-
 There are three example programs that you can run on your own.
 
 ```shell
@@ -49,13 +46,11 @@ $ git clone https://github.com/kolapapa/surge-ping.git
 $ cd surge-ping
 
 
-$ cargo build --example simple
-sudo ./target/debug/examples/simple -h 8.8.8.8 -s 56
+$ cargo run --example simple -- -h 8.8.8.8 -s 56
 V4(Icmpv4Packet { source: 8.8.8.8, destination: 10.1.40.79, ttl: 53, icmp_type: IcmpType(0), icmp_code: IcmpCode(0), size: 64, real_dest: 8.8.8.8, identifier: 111, sequence: 0 }) 112.36ms
 
 
-$ cargo build --example cmd
-sudo ./target/debug/examples/cmd -h google.com -c 5                    
+$ cargo run --example cmd -- -h google.com -c 5
 PING google.com (172.217.24.238): 56 data bytes
 64 bytes from 172.217.24.238: icmp_seq=0 ttl=115 time=109.902 ms
 64 bytes from 172.217.24.238: icmp_seq=1 ttl=115 time=73.684 ms

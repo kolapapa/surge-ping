@@ -34,8 +34,8 @@ pub(crate) struct AsyncSocket {
 impl AsyncSocket {
     pub(crate) fn new(config: &Config) -> io::Result<Self> {
         let socket = match config.kind {
-            ICMP::V4 => Socket::new(Domain::IPV4, Type::RAW, Some(Protocol::ICMPV4))?,
-            ICMP::V6 => Socket::new(Domain::IPV6, Type::RAW, Some(Protocol::ICMPV6))?,
+            ICMP::V4 => Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::ICMPV4))?,
+            ICMP::V6 => Socket::new(Domain::IPV6, Type::DGRAM, Some(Protocol::ICMPV6))?,
         };
         socket.set_nonblocking(true)?;
         if let Some(sock_addr) = &config.bind {
