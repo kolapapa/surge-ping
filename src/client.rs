@@ -11,6 +11,7 @@ use std::{
     time::Instant,
 };
 
+use cfg_if::cfg_if;
 use parking_lot::Mutex;
 use socket2::{Domain, Protocol, Socket, Type};
 use tokio::{
@@ -33,10 +34,38 @@ pub(crate) struct AsyncSocket {
 
 impl AsyncSocket {
     pub(crate) fn new(config: &Config) -> io::Result<Self> {
-        let socket = match config.kind {
-            ICMP::V4 => Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::ICMPV4))?,
-            ICMP::V6 => Socket::new(Domain::IPV6, Type::DGRAM, Some(Protocol::ICMPV6))?,
+        let sock_type = {
+            cfg_if! {
+                if #[cfg(any(target_os = "linux"))] {
+                    use crate::util::{CheckAllowRawSocket, CheckAllowUnprivilegedIcmp};
+
+                    if config.kind .allow_unprivileged_icmp() {
+                        //  enable by running: `sudo sysctl -w net.ipv4.ping_group_range='0 2147483647'`
+                        Type::DGRAM
+                    } else if config.kind .allow_raw_socket() {
+                        // enable by running: `sudo setcap CAP_NET_RAW+eip /path/to/program`
+                        Type::RAW
+                    } else {
+                        panic!("unpriviledged ping is disabled, please enable by setting `net.ipv4.ping_group_range` or setting `CAP_NET_RAW`")
+                    }
+                } else if #[cfg(any(target_os = "macos"))] {
+                    // MacOS seems enable UNPRIVILEGED_ICMP by default.
+                    Type::DGRAM
+                } else if #[cfg(any(target_os = "windows"))] {
+                    // Windows seems enable RAW_SOCKET by default.
+                    Type::RAW
+                } else {
+                    Type::RAW
+                }
+            }
         };
+
+        
+        let socket = match config.kind {
+            ICMP::V4 => Socket::new(Domain::IPV4, sock_type, Some(Protocol::ICMPV4)),
+            ICMP::V6 => Socket::new(Domain::IPV6, sock_type, Some(Protocol::ICMPV6)),
+        }?;
+
         socket.set_nonblocking(true)?;
         if let Some(sock_addr) = &config.bind {
             socket.bind(sock_addr)?;
@@ -165,7 +194,7 @@ async fn recv_task(socket: AsyncSocket, reply_map: ReplyMap) {
             let message = &buf[..sz];
             let packet = {
                 let result = match addr.ip() {
-                    IpAddr::V4(_addr) => Icmpv4Packet::decode(message).map(IcmpPacket::V4),
+                    IpAddr::V4(addr) => Icmpv4Packet::decode(message, addr).map(IcmpPacket::V4),
                     IpAddr::V6(addr) => Icmpv6Packet::decode(message, addr).map(IcmpPacket::V6),
                 };
                 match result {

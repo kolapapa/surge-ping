@@ -16,7 +16,7 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         "172.217.26.142",
         "240c::6666",
         "2a02:930::ff76",
-        "114.114.114.114",
+        // "114.114.114.114",
     ];
     let client_v4 = Client::new(&Config::default())?;
     let client_v6 = Client::new(&Config::builder().kind(ICMP::V6).build())?;

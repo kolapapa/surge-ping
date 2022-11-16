@@ -38,6 +38,19 @@ impl Pinger {
         socket: AsyncSocket,
         response_map: ReplyMap,
     ) -> Pinger {
+        use cfg_if::cfg_if;
+
+        cfg_if! {
+            if #[cfg(any(target_os = "linux"))] {
+                use crate::util::CheckAllowUnprivilegedIcmp;
+                let mut ident = ident;
+
+                if host.allow_unprivileged_icmp() {
+                    ident = PingIdentifier(0)
+                }
+            }
+        }
+        
         Pinger {
             host,
             ident,

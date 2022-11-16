@@ -1,5 +1,6 @@
 use std::convert::TryInto;
 use std::net::Ipv4Addr;
+use cfg_if::cfg_if;
 
 use pnet_packet::icmp::{self, IcmpCode, IcmpType};
 use pnet_packet::Packet;
@@ -154,10 +155,24 @@ impl Icmpv4Packet {
     }
 
     /// Decode into icmp packet from the socket message.
-    pub fn decode(buf: &[u8]) -> Result<Self> {
+    pub fn decode(buf: &[u8], destination: Ipv4Addr) -> Result<Self> {
         let ipv4_packet = ipv4::Ipv4Packet::new(buf)
-            .ok_or_else(|| SurgeError::from(MalformedPacketError::NotIpv4Packet))?;
-        let payload = ipv4_packet.payload();
+        .ok_or_else(|| SurgeError::from(MalformedPacketError::NotIpv4Packet))?;
+
+        cfg_if! {
+            if #[cfg(any(target_os = "linux"))] {
+                use crate::util::ALLOW_IPV4_UNPRIVILEGED_ICMP;
+                let payload = if *ALLOW_IPV4_UNPRIVILEGED_ICMP {
+                    buf
+                } else {
+                    ipv4_packet.payload()
+                };
+            } else {
+                let payload = ipv4_packet.payload();
+            }
+        }
+
+
         let icmp_packet = icmp::IcmpPacket::new(payload)
             .ok_or_else(|| SurgeError::from(MalformedPacketError::NotIcmpv4Packet))?;
         match icmp_packet.get_icmp_type() {
@@ -166,13 +181,13 @@ impl Icmpv4Packet {
                     .ok_or_else(|| SurgeError::from(MalformedPacketError::NotIcmpv4Packet))?;
                 let mut packet = Icmpv4Packet::default();
                 packet
-                    .source(ipv4_packet.get_source())
+                    .source(destination)
                     .destination(ipv4_packet.get_destination())
                     .ttl(ipv4_packet.get_ttl())
                     .icmp_type(icmp_packet.get_icmp_type())
                     .icmp_code(icmp_packet.get_icmp_code())
                     .size(icmp_packet.packet().len())
-                    .real_dest(ipv4_packet.get_source())
+                    .real_dest(destination)
                     .identifier(icmp_packet.get_identifier().into())
                     .sequence(icmp_packet.get_sequence_number().into());
                 Ok(packet)
@@ -194,8 +209,8 @@ impl Icmpv4Packet {
                 let sequence = u16::from_be_bytes(icmp_payload[30..32].try_into().unwrap());
                 let mut packet = Icmpv4Packet::default();
                 packet
-                    .source(ipv4_packet.get_source())
-                    .destination(ipv4_packet.get_destination())
+                    .source(destination)
+                    .destination(destination)
                     .ttl(ipv4_packet.get_ttl())
                     .icmp_type(icmp_packet.get_icmp_type())
                     .icmp_code(icmp_packet.get_icmp_code())
@@ -211,24 +226,26 @@ impl Icmpv4Packet {
 
 #[cfg(test)]
 mod tests {
+    use std::{net::Ipv4Addr, str::FromStr};
+
     use crate::Icmpv4Packet;
 
     #[test]
     fn malformed_packet() {
         let decoded = hex::decode("4500001d0000000079018a76acd90e6e0a00f22203006c3293cc").unwrap();
-        assert!(Icmpv4Packet::decode(&decoded).is_err());
+        assert!(Icmpv4Packet::decode(&decoded, Ipv4Addr::from_str("0.0.0.0").unwrap()).is_err());
     }
 
     #[test]
     fn short_packet() {
         let decoded =
             hex::decode("4500001d0000000079018a76acd90e6e0a00f22203006c3293cc000100").unwrap();
-        assert!(Icmpv4Packet::decode(&decoded).is_err());
+        assert!(Icmpv4Packet::decode(&decoded, Ipv4Addr::from_str("0.0.0.0").unwrap()).is_err());
     }
 
     #[test]
     fn standard_packet() {
         let decoded = hex::decode("45000054000000007901067e8efab00e0a00f22203004176a1ee0001613dd762000000002127040000000000101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f3031323334353637").unwrap();
-        Icmpv4Packet::decode(&decoded).unwrap();
+        Icmpv4Packet::decode(&decoded, Ipv4Addr::from_str("0.0.0.0").unwrap()).unwrap();
     }
 }

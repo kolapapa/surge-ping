@@ -1,5 +1,7 @@
 use std::fmt;
 
+use cfg_if::cfg_if;
+
 pub mod icmpv4;
 pub mod icmpv6;
 
@@ -14,9 +16,31 @@ pub enum IcmpPacket {
 
 impl IcmpPacket {
     pub fn get_identifier(&self) -> PingIdentifier {
-        match self {
-            IcmpPacket::V4(packet) => packet.get_identifier(),
-            IcmpPacket::V6(packet) => packet.get_identifier(),
+        cfg_if! {
+            if #[cfg(any(target_os = "linux"))] {
+                use crate::util::{ALLOW_IPV4_UNPRIVILEGED_ICMP, ALLOW_IPV6_UNPRIVILEGED_ICMP};
+                match self {
+                    IcmpPacket::V4(packet) => {
+                        if *ALLOW_IPV4_UNPRIVILEGED_ICMP {
+                            PingIdentifier(0)
+                        } else {
+                            packet.get_identifier()
+                        }
+                    },
+                    IcmpPacket::V6(packet) => {
+                        if *ALLOW_IPV6_UNPRIVILEGED_ICMP {
+                            PingIdentifier(0)
+                        } else {
+                            packet.get_identifier()
+                        }
+                    },
+                }
+            } else {
+                match self {
+                    IcmpPacket::V4(packet) => packet.get_identifier(),
+                    IcmpPacket::V6(packet) => packet.get_identifier(),
+                }
+            }
         }
     }
 

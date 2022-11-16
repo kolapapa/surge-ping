@@ -3,6 +3,7 @@ mod config;
 mod error;
 mod icmp;
 mod ping;
+mod util;
 
 use std::{net::IpAddr, time::Duration};
 
@@ -14,6 +15,7 @@ pub use icmp::{
 };
 pub use ping::Pinger;
 use rand::random;
+pub use util::*;
 
 #[derive(Debug, Clone, Copy)]
 pub enum ICMP {
