@@ -1,18 +1,32 @@
 use std::net::SocketAddr;
 
-use socket2::SockAddr;
+use socket2::{SockAddr, Type};
 
 use crate::ICMP;
 
 /// Config is the packaging of various configurations of `sockets`. If you want to make
 /// some `set_socket_opt` and other modifications, please define and implement them in `Config`.
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct Config {
+    pub sock_type_hint: Type,
     pub kind: ICMP,
     pub bind: Option<SockAddr>,
     pub interface: Option<String>,
     pub ttl: Option<u32>,
     pub fib: Option<u32>,
+}
+
+impl Default for Config {
+    fn default() -> Self {
+        Self {
+            sock_type_hint: Type::DGRAM,
+            kind: ICMP::default(),
+            bind: None,
+            interface: None,
+            ttl: None,
+            fib: None,
+        }
+    }
 }
 
 impl Config {
@@ -26,13 +40,27 @@ impl Config {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct ConfigBuilder {
+    sock_type_hint: Type,
     kind: ICMP,
     bind: Option<SockAddr>,
     interface: Option<String>,
     ttl: Option<u32>,
     fib: Option<u32>,
+}
+
+impl Default for ConfigBuilder {
+    fn default() -> Self {
+        Self {
+            sock_type_hint: Type::DGRAM,
+            kind: ICMP::default(),
+            bind: None,
+            interface: None,
+            ttl: None,
+            fib: None,
+        }
+    }
 }
 
 impl ConfigBuilder {
@@ -75,8 +103,15 @@ impl ConfigBuilder {
         self
     }
 
+    /// Try to open the socket with provided at first (DGRAM or RAW)
+    pub fn sock_type_hint(mut self, typ: Type) -> Self {
+        self.sock_type_hint = typ;
+        self
+    }
+
     pub fn build(self) -> Config {
         Config {
+            sock_type_hint: self.sock_type_hint,
             kind: self.kind,
             bind: self.bind,
             interface: self.interface,

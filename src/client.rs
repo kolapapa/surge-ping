@@ -27,16 +27,14 @@ use crate::{
 };
 
 #[derive(Clone)]
-pub(crate) struct AsyncSocket {
+pub struct AsyncSocket {
     inner: Arc<UdpSocket>,
 }
 
 impl AsyncSocket {
-    pub(crate) fn new(config: &Config) -> io::Result<Self> {
-        let socket = match config.kind {
-            ICMP::V4 => Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::ICMPV4))?,
-            ICMP::V6 => Socket::new(Domain::IPV6, Type::DGRAM, Some(Protocol::ICMPV6))?,
-        };
+    pub fn new(config: &Config) -> io::Result<Self> {
+        let socket = Self::create_socket(config)?;
+
         socket.set_nonblocking(true)?;
         if let Some(sock_addr) = &config.bind {
             socket.bind(sock_addr)?;
@@ -64,11 +62,36 @@ impl AsyncSocket {
         })
     }
 
-    pub(crate) async fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+    fn create_socket(config: &Config) -> io::Result<Socket> {
+        let (domain, proto) = match config.kind {
+            ICMP::V4 => (Domain::IPV4, Some(Protocol::ICMPV4)),
+            ICMP::V6 => (Domain::IPV6, Some(Protocol::ICMPV6)),
+        };
+
+        match Socket::new(domain, config.sock_type_hint, proto) {
+            Ok(sock) => Ok(sock),
+            Err(err) => {
+                let new_type = if config.sock_type_hint == Type::DGRAM {
+                    Type::RAW
+                } else {
+                    Type::DGRAM
+                };
+
+                debug!(
+                    "error opening {:?} type socket, trying {:?}: {:?}",
+                    config.sock_type_hint, new_type, err
+                );
+
+                Ok(Socket::new(domain, new_type, proto)?)
+            }
+        }
+    }
+
+    pub async fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         self.inner.recv_from(buf).await
     }
 
-    pub(crate) async fn send_to(&self, buf: &mut [u8], target: &SocketAddr) -> io::Result<usize> {
+    pub async fn send_to(&self, buf: &mut [u8], target: &SocketAddr) -> io::Result<usize> {
         self.inner.send_to(buf, target).await
     }
 }
