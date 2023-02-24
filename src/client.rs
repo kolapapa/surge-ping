@@ -12,7 +12,7 @@ use std::{
 };
 
 use parking_lot::Mutex;
-use socket2::{Domain, Protocol, Socket, Type};
+use socket2::{Domain, Protocol, Socket, Type as SockType};
 use tokio::{
     net::UdpSocket,
     sync::oneshot,
@@ -26,10 +26,25 @@ use crate::{
     IcmpPacket, PingIdentifier, PingSequence, Pinger, SurgeError, ICMP,
 };
 
+// Check, if the platform's socket operates with ICMP packets in a casual way
+#[macro_export]
+macro_rules! is_linux_icmp_socket {
+    ($sock_type:expr) => {
+        if ($sock_type == socket2::Type::DGRAM
+            && cfg!(not(any(target_os = "linux", target_os = "android"))))
+            || $sock_type == socket2::Type::RAW
+        {
+            false
+        } else {
+            true
+        }
+    };
+}
+
 #[derive(Clone)]
 pub struct AsyncSocket {
     inner: Arc<UdpSocket>,
-    sock_type: Type,
+    sock_type: SockType,
 }
 
 impl AsyncSocket {
@@ -64,7 +79,7 @@ impl AsyncSocket {
         })
     }
 
-    fn create_socket(config: &Config) -> io::Result<(Type, Socket)> {
+    fn create_socket(config: &Config) -> io::Result<(SockType, Socket)> {
         let (domain, proto) = match config.kind {
             ICMP::V4 => (Domain::IPV4, Some(Protocol::ICMPV4)),
             ICMP::V6 => (Domain::IPV6, Some(Protocol::ICMPV6)),
@@ -73,10 +88,10 @@ impl AsyncSocket {
         match Socket::new(domain, config.sock_type_hint, proto) {
             Ok(sock) => Ok((config.sock_type_hint, sock)),
             Err(err) => {
-                let new_type = if config.sock_type_hint == Type::DGRAM {
-                    Type::RAW
+                let new_type = if config.sock_type_hint == SockType::DGRAM {
+                    SockType::RAW
                 } else {
-                    Type::DGRAM
+                    SockType::DGRAM
                 };
 
                 debug!(
@@ -101,13 +116,13 @@ impl AsyncSocket {
         self.inner.local_addr()
     }
 
-    pub fn get_type(&self) -> Type {
+    pub fn get_type(&self) -> SockType {
         self.sock_type
     }
 }
 
 #[derive(PartialEq, Eq, Hash)]
-struct ReplyToken(IpAddr, PingIdentifier, PingSequence);
+struct ReplyToken(IpAddr, Option<PingIdentifier>, PingSequence);
 
 pub(crate) struct Reply {
     pub timestamp: Instant,
@@ -124,7 +139,7 @@ impl ReplyMap {
     pub fn new_waiter(
         &self,
         host: IpAddr,
-        ident: PingIdentifier,
+        ident: Option<PingIdentifier>,
         seq: PingSequence,
     ) -> Result<oneshot::Receiver<Reply>, SurgeError> {
         let (tx, rx) = oneshot::channel();
@@ -143,7 +158,7 @@ impl ReplyMap {
     pub(crate) fn remove(
         &self,
         host: IpAddr,
-        ident: PingIdentifier,
+        ident: Option<PingIdentifier>,
         seq: PingSequence,
     ) -> Option<oneshot::Sender<Reply>> {
         self.0.lock().remove(&ReplyToken(host, ident, seq))
@@ -220,9 +235,15 @@ async fn recv_task(socket: AsyncSocket, reply_map: ReplyMap) {
                     }
                 }
             };
-            if let Some(waiter) =
-                reply_map.remove(addr.ip(), packet.get_identifier(), packet.get_sequence())
-            {
+
+            let ident;
+            if is_linux_icmp_socket!(socket.get_type()) {
+                ident = None;
+            } else {
+                ident = Some(packet.get_identifier());
+            }
+
+            if let Some(waiter) = reply_map.remove(addr.ip(), ident, packet.get_sequence()) {
                 // If send fails the receiving end has closed. Nothing to do.
                 let _ = waiter.send(Reply { timestamp, packet });
             } else {

@@ -6,7 +6,10 @@ use pnet_packet::icmp::{self, IcmpCode, IcmpType};
 use pnet_packet::Packet;
 use pnet_packet::{ipv4, PacketSize};
 
-use crate::error::{MalformedPacketError, Result, SurgeError};
+use crate::{
+    error::{MalformedPacketError, Result, SurgeError},
+    is_linux_icmp_socket,
+};
 
 use super::{PingIdentifier, PingSequence};
 
@@ -23,12 +26,10 @@ pub fn make_icmpv4_echo_packet(
 
     packet.set_icmp_type(icmp::IcmpTypes::EchoRequest);
     packet.set_payload(payload);
+    packet.set_sequence_number(seq_cnt.into_u16());
 
-    if (sock_type == SockType::DGRAM && cfg!(not(any(target_os = "linux", target_os = "android"))))
-        || sock_type == SockType::RAW
-    {
+    if !(is_linux_icmp_socket!(sock_type)) {
         packet.set_identifier(ident_hint.into_u16());
-        packet.set_sequence_number(seq_cnt.into_u16());
 
         // Calculate and set the checksum
         let icmp_packet =
@@ -170,11 +171,10 @@ impl Icmpv4Packet {
         src_addr: Ipv4Addr,
         dst_addr: Ipv4Addr,
     ) -> Result<Self> {
-        if sock_type == SockType::RAW || cfg!(not(any(target_os = "linux", target_os = "android")))
-        {
-            Self::decode_from_ipv4(buf)
-        } else {
+        if is_linux_icmp_socket!(sock_type) {
             Self::decode_from_icmp(buf, src_addr, dst_addr)
+        } else {
+            Self::decode_from_ipv4(buf)
         }
     }
 
