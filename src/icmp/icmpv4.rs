@@ -288,24 +288,71 @@ impl Icmpv4Packet {
 
 #[cfg(test)]
 mod tests {
+    use super::*;
     use crate::Icmpv4Packet;
 
     #[test]
     fn malformed_packet() {
-        let decoded = hex::decode("4500001d0000000079018a76acd90e6e0a00f22203006c3293cc").unwrap();
-        assert!(Icmpv4Packet::decode(&decoded).is_err());
+        let decoded_ipv4 =
+            hex::decode("4500001d0000000079018a76acd90e6e0a00f22203006c3293cc").unwrap();
+        assert!(Icmpv4Packet::decode(
+            &decoded_ipv4,
+            SockType::RAW,
+            ("172.217.14.110").parse().unwrap(),
+            ("10.0.242.34").parse().unwrap(),
+        )
+        .is_err());
+
+        let decoded_icmp = hex::decode("03006c3293cc").unwrap();
+        assert!(Icmpv4Packet::decode(
+            &decoded_icmp,
+            SockType::DGRAM,
+            ("172.217.14.110").parse().unwrap(),
+            ("10.0.242.34").parse().unwrap(),
+        )
+        .is_err());
     }
 
     #[test]
     fn short_packet() {
-        let decoded =
+        let decoded_ipv4 =
             hex::decode("4500001d0000000079018a76acd90e6e0a00f22203006c3293cc000100").unwrap();
-        assert!(Icmpv4Packet::decode(&decoded).is_err());
+        assert!(Icmpv4Packet::decode(
+            &decoded_ipv4,
+            SockType::RAW,
+            ("172.217.14.110").parse().unwrap(),
+            ("10.0.242.34").parse().unwrap(),
+        )
+        .is_err());
+
+        let decoded_icmp = hex::decode("03006c3293cc000100").unwrap();
+        assert!(Icmpv4Packet::decode(
+            &decoded_icmp,
+            SockType::DGRAM,
+            ("172.217.14.110").parse().unwrap(),
+            ("10.0.242.34").parse().unwrap(),
+        )
+        .is_err());
     }
 
     #[test]
     fn standard_packet() {
-        let decoded = hex::decode("45000054000000007901067e8efab00e0a00f22203004176a1ee0001613dd762000000002127040000000000101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f3031323334353637").unwrap();
-        Icmpv4Packet::decode(&decoded).unwrap();
+        let decoded_ipv4 = hex::decode("45000054000000007901067e8efab00e0a00f22203004176a1ee0001613dd762000000002127040000000000101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f3031323334353637").unwrap();
+        Icmpv4Packet::decode(
+            &decoded_ipv4,
+            SockType::RAW,
+            ("172.217.14.110").parse().unwrap(),
+            ("10.0.242.34").parse().unwrap(),
+        )
+        .unwrap();
+
+        let decoded_icmp = hex::decode("03004176a1ee0001613dd762000000002127040000000000101112131415161718191a1b1c1d1e1f202122232425262728292a2b2c2d2e2f3031323334353637").unwrap();
+        Icmpv4Packet::decode(
+            &decoded_icmp,
+            SockType::DGRAM,
+            ("172.217.14.110").parse().unwrap(),
+            ("10.0.242.34").parse().unwrap(),
+        )
+        .unwrap();
     }
 }
