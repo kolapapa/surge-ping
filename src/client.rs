@@ -46,7 +46,7 @@ impl AsyncSocket {
                         // enable by running: `sudo setcap CAP_NET_RAW+eip /path/to/program`
                         Type::RAW
                     } else {
-                        panic!("unpriviledged ping is disabled, please enable by setting `net.ipv4.ping_group_range` or setting `CAP_NET_RAW`")
+                        return Err(io::Error::new(io::ErrorKind::PermissionDenied, "unpriviledged ping is disabled, please enable by `sudo sysctl -w net.ipv4.ping_group_range='0 2147483647'` or `sudo setcap CAP_NET_RAW+eip /path/to/program`"))
                     }
                 } else if #[cfg(any(target_os = "macos"))] {
                     // MacOS seems enable UNPRIVILEGED_ICMP by default.
