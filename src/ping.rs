@@ -14,7 +14,7 @@ use crate::{
 /// A Ping struct represents the state of one particular ping instance.
 pub struct Pinger {
     pub host: IpAddr,
-    pub ident: PingIdentifier,
+    pub ident_hint: PingIdentifier,
     timeout: Duration,
     socket: AsyncSocket,
     reply_map: ReplyMap,
@@ -26,7 +26,7 @@ impl Drop for Pinger {
         if let Some(sequence) = self.last_sequence.take() {
             // Ensure no reply waiter is left hanging if this pinger is dropped while
             // waiting for a reply.
-            self.reply_map.remove(self.host, self.ident, sequence);
+            self.reply_map.remove(self.host, self.ident_hint, sequence);
         }
     }
 }
@@ -34,13 +34,13 @@ impl Drop for Pinger {
 impl Pinger {
     pub(crate) fn new(
         host: IpAddr,
-        ident: PingIdentifier,
+        ident_hint: PingIdentifier,
         socket: AsyncSocket,
         response_map: ReplyMap,
     ) -> Pinger {
         Pinger {
             host,
-            ident,
+            ident_hint,
             timeout: Duration::from_secs(2),
             socket,
             reply_map: response_map,
@@ -61,13 +61,19 @@ impl Pinger {
         payload: &[u8],
     ) -> Result<(IcmpPacket, Duration)> {
         // Register to wait for a reply.
-        let reply_waiter = self.reply_map.new_waiter(self.host, self.ident, seq)?;
+        let reply_waiter = self.reply_map.new_waiter(self.host, self.ident_hint, seq)?;
 
         // Create and send ping packet.
         let mut packet = match self.host {
-            IpAddr::V4(_) => icmpv4::make_icmpv4_echo_packet(self.ident, seq, payload)?,
-            IpAddr::V6(_) => icmpv6::make_icmpv6_echo_packet(self.ident, seq, payload)?,
+            IpAddr::V4(_) => icmpv4::make_icmpv4_echo_packet(
+                self.ident_hint,
+                seq,
+                self.socket.get_type(),
+                payload,
+            )?,
+            IpAddr::V6(_) => icmpv6::make_icmpv6_echo_packet(self.ident_hint, seq, payload)?,
         };
+
         self.socket
             .send_to(&mut packet, &SocketAddr::new(self.host, 0))
             .await?;
@@ -82,7 +88,7 @@ impl Pinger {
             )),
             Ok(Err(_err)) => Err(SurgeError::NetworkError),
             Err(_) => {
-                self.reply_map.remove(self.host, self.ident, seq);
+                self.reply_map.remove(self.host, self.ident_hint, seq);
                 Err(SurgeError::Timeout { seq })
             }
         };

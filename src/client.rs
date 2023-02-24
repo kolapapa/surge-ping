@@ -29,11 +29,12 @@ use crate::{
 #[derive(Clone)]
 pub struct AsyncSocket {
     inner: Arc<UdpSocket>,
+    sock_type: Type,
 }
 
 impl AsyncSocket {
     pub fn new(config: &Config) -> io::Result<Self> {
-        let socket = Self::create_socket(config)?;
+        let (sock_type, socket) = Self::create_socket(config)?;
 
         socket.set_nonblocking(true)?;
         if let Some(sock_addr) = &config.bind {
@@ -59,17 +60,18 @@ impl AsyncSocket {
             UdpSocket::from_std(unsafe { std::net::UdpSocket::from_raw_fd(socket.into_raw_fd()) })?;
         Ok(Self {
             inner: Arc::new(socket),
+            sock_type,
         })
     }
 
-    fn create_socket(config: &Config) -> io::Result<Socket> {
+    fn create_socket(config: &Config) -> io::Result<(Type, Socket)> {
         let (domain, proto) = match config.kind {
             ICMP::V4 => (Domain::IPV4, Some(Protocol::ICMPV4)),
             ICMP::V6 => (Domain::IPV6, Some(Protocol::ICMPV6)),
         };
 
         match Socket::new(domain, config.sock_type_hint, proto) {
-            Ok(sock) => Ok(sock),
+            Ok(sock) => Ok((config.sock_type_hint, sock)),
             Err(err) => {
                 let new_type = if config.sock_type_hint == Type::DGRAM {
                     Type::RAW
@@ -82,7 +84,7 @@ impl AsyncSocket {
                     config.sock_type_hint, new_type, err
                 );
 
-                Ok(Socket::new(domain, new_type, proto)?)
+                Ok((new_type, Socket::new(domain, new_type, proto)?))
             }
         }
     }
@@ -93,6 +95,14 @@ impl AsyncSocket {
 
     pub async fn send_to(&self, buf: &mut [u8], target: &SocketAddr) -> io::Result<usize> {
         self.inner.send_to(buf, target).await
+    }
+
+    pub fn local_addr(&self) -> io::Result<SocketAddr> {
+        self.inner.local_addr()
+    }
+
+    pub fn get_type(&self) -> Type {
+        self.sock_type
     }
 }
 
@@ -186,10 +196,21 @@ async fn recv_task(socket: AsyncSocket, reply_map: ReplyMap) {
         if let Ok((sz, addr)) = socket.recv_from(&mut buf).await {
             let timestamp = Instant::now();
             let message = &buf[..sz];
+            let local_addr = socket.local_addr().unwrap().ip();
             let packet = {
                 let result = match addr.ip() {
-                    IpAddr::V4(_addr) => Icmpv4Packet::decode(message).map(IcmpPacket::V4),
-                    IpAddr::V6(addr) => Icmpv6Packet::decode(message, addr).map(IcmpPacket::V6),
+                    IpAddr::V4(src_addr) => {
+                        let local_addr_ip4 = match local_addr {
+                            IpAddr::V4(local_addr_ip4) => local_addr_ip4,
+                            _ => continue,
+                        };
+
+                        Icmpv4Packet::decode(message, socket.sock_type, src_addr, local_addr_ip4)
+                            .map(IcmpPacket::V4)
+                    }
+                    IpAddr::V6(src_addr) => {
+                        Icmpv6Packet::decode(message, src_addr).map(IcmpPacket::V6)
+                    }
                 };
                 match result {
                     Ok(packet) => packet,

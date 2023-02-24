@@ -158,7 +158,7 @@ async fn main() {
         match pinger.ping(PingSequence(idx), &payload).await {
             Ok((IcmpPacket::V4(reply), dur)) => {
                 println!(
-                    "{} bytes from {}: icmp_seq={} ttl={} time={:0.3?}",
+                    "{} bytes from {}: icmp_seq={} ttl={:?} time={:0.3?}",
                     reply.get_size(),
                     reply.get_source(),
                     reply.get_sequence(),

@@ -1,3 +1,4 @@
+use socket2::Type as SockType;
 use std::convert::TryInto;
 use std::net::Ipv4Addr;
 
@@ -10,23 +11,32 @@ use crate::error::{MalformedPacketError, Result, SurgeError};
 use super::{PingIdentifier, PingSequence};
 
 pub fn make_icmpv4_echo_packet(
-    ident: PingIdentifier,
+    ident_hint: PingIdentifier,
     seq_cnt: PingSequence,
+    sock_type: SockType,
     payload: &[u8],
 ) -> Result<Vec<u8>> {
-    let mut buf = vec![0; 8 + payload.len()]; // 8 bytes of header, then payload
+    // 8 bytes of header, then payload.
+    let mut buf = vec![0; 8 + payload.len()];
     let mut packet = icmp::echo_request::MutableEchoRequestPacket::new(&mut buf[..])
         .ok_or(SurgeError::IncorrectBufferSize)?;
+
     packet.set_icmp_type(icmp::IcmpTypes::EchoRequest);
-    packet.set_identifier(ident.into_u16());
-    packet.set_sequence_number(seq_cnt.into_u16());
     packet.set_payload(payload);
 
-    // Calculate and set the checksum
-    let icmp_packet =
-        icmp::IcmpPacket::new(packet.packet()).ok_or(SurgeError::IncorrectBufferSize)?;
-    let checksum = icmp::checksum(&icmp_packet);
-    packet.set_checksum(checksum);
+    if (sock_type == SockType::DGRAM && cfg!(not(any(target_os = "linux", target_os = "android"))))
+        || sock_type == SockType::RAW
+    {
+        packet.set_identifier(ident_hint.into_u16());
+        packet.set_sequence_number(seq_cnt.into_u16());
+
+        // Calculate and set the checksum
+        let icmp_packet =
+            icmp::IcmpPacket::new(packet.packet()).ok_or(SurgeError::IncorrectBufferSize)?;
+
+        let checksum = icmp::checksum(&icmp_packet);
+        packet.set_checksum(checksum);
+    }
 
     Ok(packet.packet().to_vec())
 }
@@ -36,7 +46,7 @@ pub fn make_icmpv4_echo_packet(
 pub struct Icmpv4Packet {
     source: Ipv4Addr,
     destination: Ipv4Addr,
-    ttl: u8,
+    ttl: Option<u8>,
     icmp_type: IcmpType,
     icmp_code: IcmpCode,
     size: usize,
@@ -50,7 +60,7 @@ impl Default for Icmpv4Packet {
         Icmpv4Packet {
             source: Ipv4Addr::new(127, 0, 0, 1),
             destination: Ipv4Addr::new(127, 0, 0, 1),
-            ttl: 0,
+            ttl: None,
             icmp_type: IcmpType::new(0),
             icmp_code: IcmpCode::new(0),
             size: 0,
@@ -83,12 +93,12 @@ impl Icmpv4Packet {
     }
 
     fn ttl(&mut self, ttl: u8) -> &mut Self {
-        self.ttl = ttl;
+        self.ttl = Some(ttl);
         self
     }
 
     /// Get the ttl field.
-    pub fn get_ttl(&self) -> u8 {
+    pub fn get_ttl(&self) -> Option<u8> {
         self.ttl
     }
 
@@ -154,17 +164,32 @@ impl Icmpv4Packet {
     }
 
     /// Decode into icmp packet from the socket message.
-    pub fn decode(buf: &[u8]) -> Result<Self> {
+    pub fn decode(
+        buf: &[u8],
+        sock_type: SockType,
+        src_addr: Ipv4Addr,
+        dst_addr: Ipv4Addr,
+    ) -> Result<Self> {
+        if sock_type == SockType::RAW || cfg!(not(any(target_os = "linux", target_os = "android")))
+        {
+            Self::decode_from_ipv4(buf)
+        } else {
+            Self::decode_from_icmp(buf, src_addr, dst_addr)
+        }
+    }
+
+    fn decode_from_ipv4(buf: &[u8]) -> Result<Self> {
         let ipv4_packet = ipv4::Ipv4Packet::new(buf)
             .ok_or_else(|| SurgeError::from(MalformedPacketError::NotIpv4Packet))?;
-        let payload = ipv4_packet.payload();
-        let icmp_packet = icmp::IcmpPacket::new(payload)
+        let icmp_packet = icmp::IcmpPacket::new(ipv4_packet.payload())
             .ok_or_else(|| SurgeError::from(MalformedPacketError::NotIcmpv4Packet))?;
+        let mut packet = Icmpv4Packet::default();
+
         match icmp_packet.get_icmp_type() {
             icmp::IcmpTypes::EchoReply => {
-                let icmp_packet = icmp::echo_reply::EchoReplyPacket::new(payload)
+                let icmp_packet = icmp::echo_reply::EchoReplyPacket::new(icmp_packet.packet())
                     .ok_or_else(|| SurgeError::from(MalformedPacketError::NotIcmpv4Packet))?;
-                let mut packet = Icmpv4Packet::default();
+
                 packet
                     .source(ipv4_packet.get_source())
                     .destination(ipv4_packet.get_destination())
@@ -175,9 +200,8 @@ impl Icmpv4Packet {
                     .real_dest(ipv4_packet.get_source())
                     .identifier(icmp_packet.get_identifier().into())
                     .sequence(icmp_packet.get_sequence_number().into());
-                Ok(packet)
             }
-            icmp::IcmpTypes::EchoRequest => Err(SurgeError::EchoRequestPacket),
+            icmp::IcmpTypes::EchoRequest => return Err(SurgeError::EchoRequestPacket),
             _ => {
                 let icmp_payload = icmp_packet.payload();
 
@@ -192,7 +216,7 @@ impl Icmpv4Packet {
                     .ok_or_else(|| SurgeError::from(MalformedPacketError::NotIpv4Packet))?;
                 let identifier = u16::from_be_bytes(icmp_payload[28..30].try_into().unwrap());
                 let sequence = u16::from_be_bytes(icmp_payload[30..32].try_into().unwrap());
-                let mut packet = Icmpv4Packet::default();
+
                 packet
                     .source(ipv4_packet.get_source())
                     .destination(ipv4_packet.get_destination())
@@ -203,9 +227,62 @@ impl Icmpv4Packet {
                     .real_dest(real_ip_packet.get_destination())
                     .identifier(identifier.into())
                     .sequence(sequence.into());
-                Ok(packet)
             }
         }
+
+        Ok(packet)
+    }
+
+    fn decode_from_icmp(buf: &[u8], src_addr: Ipv4Addr, dst_addr: Ipv4Addr) -> Result<Self> {
+        let icmp_packet = icmp::IcmpPacket::new(buf)
+            .ok_or_else(|| SurgeError::from(MalformedPacketError::NotIcmpv4Packet))?;
+        let mut packet = Icmpv4Packet::default();
+
+        match icmp_packet.get_icmp_type() {
+            icmp::IcmpTypes::EchoReply => {
+                let icmp_packet = icmp::echo_reply::EchoReplyPacket::new(icmp_packet.packet())
+                    .ok_or_else(|| SurgeError::from(MalformedPacketError::NotIcmpv4Packet))?;
+
+                packet
+                    .source(src_addr)
+                    .destination(dst_addr)
+                    .icmp_type(icmp_packet.get_icmp_type())
+                    .icmp_code(icmp_packet.get_icmp_code())
+                    .size(icmp_packet.packet().len())
+                    .real_dest(src_addr)
+                    .identifier(icmp_packet.get_identifier().into())
+                    .sequence(icmp_packet.get_sequence_number().into());
+            }
+            icmp::IcmpTypes::EchoRequest => return Err(SurgeError::EchoRequestPacket),
+            _ => {
+                let icmp_payload = icmp_packet.payload();
+
+                if icmp_payload.len() < 32 {
+                    return Err(SurgeError::from(MalformedPacketError::PayloadTooShort {
+                        got: icmp_payload.len(),
+                        want: 32,
+                    }));
+                }
+
+                // icmp unused(4) + ip header(20) + echo icmp(4)
+                let real_ip_packet = ipv4::Ipv4Packet::new(&icmp_payload[4..])
+                    .ok_or_else(|| SurgeError::from(MalformedPacketError::NotIpv4Packet))?;
+                let identifier = u16::from_be_bytes(icmp_payload[28..30].try_into().unwrap());
+                let sequence = u16::from_be_bytes(icmp_payload[30..32].try_into().unwrap());
+
+                packet
+                    .source(src_addr)
+                    .destination(dst_addr)
+                    .icmp_type(icmp_packet.get_icmp_type())
+                    .icmp_code(icmp_packet.get_icmp_code())
+                    .size(icmp_packet.packet_size())
+                    .real_dest(real_ip_packet.get_destination())
+                    .identifier(identifier.into())
+                    .sequence(sequence.into());
+            }
+        }
+
+        Ok(packet)
     }
 }
 
