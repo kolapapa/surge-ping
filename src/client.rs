@@ -1,7 +1,7 @@
 #[cfg(unix)]
-use std::os::unix::io::{FromRawFd, IntoRawFd};
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(windows)]
-use std::os::windows::io::{FromRawSocket, IntoRawSocket};
+use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
 
 use std::{
     collections::HashMap,
@@ -119,6 +119,16 @@ impl AsyncSocket {
     pub fn get_type(&self) -> SockType {
         self.sock_type
     }
+
+    #[cfg(unix)]
+    pub fn get_native_sock(&self) -> RawFd {
+        self.inner.as_raw_fd()
+    }
+
+    #[cfg(windows)]
+    pub fn get_native_sock(&self) -> RawSocket {
+        self.inner.as_raw_socket()
+    }
 }
 
 #[derive(PartialEq, Eq, Hash)]
@@ -203,6 +213,11 @@ impl Client {
     pub async fn pinger(&self, host: IpAddr, ident: PingIdentifier) -> Pinger {
         Pinger::new(host, ident, self.socket.clone(), self.reply_map.clone())
     }
+
+    /// Expose the underlying socket, if user wants to modify any options on it
+    pub fn get_socket(&self) -> AsyncSocket {
+        self.socket.clone()
+    }
 }
 
 async fn recv_task(socket: AsyncSocket, reply_map: ReplyMap) {
@@ -236,12 +251,11 @@ async fn recv_task(socket: AsyncSocket, reply_map: ReplyMap) {
                 }
             };
 
-            let ident;
-            if is_linux_icmp_socket!(socket.get_type()) {
-                ident = None;
+            let ident = if is_linux_icmp_socket!(socket.get_type()) {
+                None
             } else {
-                ident = Some(packet.get_identifier());
-            }
+                Some(packet.get_identifier())
+            };
 
             if let Some(waiter) = reply_map.remove(addr.ip(), ident, packet.get_sequence()) {
                 // If send fails the receiving end has closed. Nothing to do.

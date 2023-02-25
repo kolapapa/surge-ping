@@ -39,12 +39,11 @@ impl Pinger {
         socket: AsyncSocket,
         response_map: ReplyMap,
     ) -> Pinger {
-        let ident;
-        if is_linux_icmp_socket!(socket.get_type()) {
-            ident = None;
+        let ident = if is_linux_icmp_socket!(socket.get_type()) {
+            None
         } else {
-            ident = Some(ident_hint);
-        }
+            Some(ident_hint)
+        };
 
         Pinger {
             host,
@@ -78,7 +77,7 @@ impl Pinger {
         self.last_sequence = Some(seq);
 
         // Wait for reply or timeout.
-        let result = match timeout(self.timeout, reply_waiter).await {
+        match timeout(self.timeout, reply_waiter).await {
             Ok(Ok(reply)) => Ok((
                 reply.packet,
                 reply.timestamp.saturating_duration_since(send_time),
@@ -88,12 +87,11 @@ impl Pinger {
                 self.reply_map.remove(self.host, self.ident, seq);
                 Err(SurgeError::Timeout { seq })
             }
-        };
-        result
+        }
     }
 
     /// Send a ping packet (useful, when you don't need a reply).
-    pub async fn send_ping(&mut self, seq: PingSequence, payload: &[u8]) -> Result<()> {
+    pub async fn send_ping(&self, seq: PingSequence, payload: &[u8]) -> Result<()> {
         // Create and send ping packet.
         let mut packet = match self.host {
             IpAddr::V4(_) => icmpv4::make_icmpv4_echo_packet(
