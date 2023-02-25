@@ -71,6 +71,29 @@ impl Pinger {
         // Register to wait for a reply.
         let reply_waiter = self.reply_map.new_waiter(self.host, self.ident, seq)?;
 
+        // Send actual packet
+        self.send_ping(seq, payload).await?;
+
+        let send_time = Instant::now();
+        self.last_sequence = Some(seq);
+
+        // Wait for reply or timeout.
+        let result = match timeout(self.timeout, reply_waiter).await {
+            Ok(Ok(reply)) => Ok((
+                reply.packet,
+                reply.timestamp.saturating_duration_since(send_time),
+            )),
+            Ok(Err(_err)) => Err(SurgeError::NetworkError),
+            Err(_) => {
+                self.reply_map.remove(self.host, self.ident, seq);
+                Err(SurgeError::Timeout { seq })
+            }
+        };
+        result
+    }
+
+    /// Send a ping packet (useful, when you don't need a reply).
+    pub async fn send_ping(&mut self, seq: PingSequence, payload: &[u8]) -> Result<()> {
         // Create and send ping packet.
         let mut packet = match self.host {
             IpAddr::V4(_) => icmpv4::make_icmpv4_echo_packet(
@@ -89,21 +112,7 @@ impl Pinger {
         self.socket
             .send_to(&mut packet, &SocketAddr::new(self.host, 0))
             .await?;
-        let send_time = Instant::now();
-        self.last_sequence = Some(seq);
 
-        // Wait for reply or timeout.
-        let result = match timeout(self.timeout, reply_waiter).await {
-            Ok(Ok(reply)) => Ok((
-                reply.packet,
-                reply.timestamp.saturating_duration_since(send_time),
-            )),
-            Ok(Err(_err)) => Err(SurgeError::NetworkError),
-            Err(_) => {
-                self.reply_map.remove(self.host, self.ident, seq);
-                Err(SurgeError::Timeout { seq })
-            }
-        };
-        result
+        Ok(())
     }
 }
