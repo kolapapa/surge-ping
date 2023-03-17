@@ -17,7 +17,7 @@ pnet_packet = "0.31"
 rand = "0.8.5"
 socket2 = { version = "0.4.7", features = ["all"] }
 thiserror = "1.0.37"
-tokio = { version = "1.21", features = ["time", "sync"] }
+tokio = { version = "1.21", features = ["time", "sync", "net", "rt"] }
 tracing = "0.1.37"
 
 
