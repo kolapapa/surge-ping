@@ -1,7 +1,7 @@
 #[cfg(unix)]
-use std::os::unix::io::{FromRawFd, IntoRawFd};
+use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(windows)]
-use std::os::windows::io::{FromRawSocket, IntoRawSocket};
+use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
 
 use std::{
     collections::HashMap,
@@ -12,7 +12,7 @@ use std::{
 };
 
 use parking_lot::Mutex;
-use socket2::{Domain, Protocol, Socket, Type};
+use socket2::{Domain, Protocol, Socket, Type as SockType};
 use tokio::{
     net::UdpSocket,
     sync::oneshot,
@@ -26,17 +26,31 @@ use crate::{
     IcmpPacket, PingIdentifier, PingSequence, Pinger, SurgeError, ICMP,
 };
 
+// Check, if the platform's socket operates with ICMP packets in a casual way
+#[macro_export]
+macro_rules! is_linux_icmp_socket {
+    ($sock_type:expr) => {
+        if ($sock_type == socket2::Type::DGRAM
+            && cfg!(not(any(target_os = "linux", target_os = "android"))))
+            || $sock_type == socket2::Type::RAW
+        {
+            false
+        } else {
+            true
+        }
+    };
+}
+
 #[derive(Clone)]
-pub(crate) struct AsyncSocket {
+pub struct AsyncSocket {
     inner: Arc<UdpSocket>,
+    sock_type: SockType,
 }
 
 impl AsyncSocket {
-    pub(crate) fn new(config: &Config) -> io::Result<Self> {
-        let socket = match config.kind {
-            ICMP::V4 => Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::ICMPV4))?,
-            ICMP::V6 => Socket::new(Domain::IPV6, Type::DGRAM, Some(Protocol::ICMPV6))?,
-        };
+    pub fn new(config: &Config) -> io::Result<Self> {
+        let (sock_type, socket) = Self::create_socket(config)?;
+
         socket.set_nonblocking(true)?;
         if let Some(sock_addr) = &config.bind {
             socket.bind(sock_addr)?;
@@ -61,20 +75,64 @@ impl AsyncSocket {
             UdpSocket::from_std(unsafe { std::net::UdpSocket::from_raw_fd(socket.into_raw_fd()) })?;
         Ok(Self {
             inner: Arc::new(socket),
+            sock_type,
         })
     }
 
-    pub(crate) async fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
+    fn create_socket(config: &Config) -> io::Result<(SockType, Socket)> {
+        let (domain, proto) = match config.kind {
+            ICMP::V4 => (Domain::IPV4, Some(Protocol::ICMPV4)),
+            ICMP::V6 => (Domain::IPV6, Some(Protocol::ICMPV6)),
+        };
+
+        match Socket::new(domain, config.sock_type_hint, proto) {
+            Ok(sock) => Ok((config.sock_type_hint, sock)),
+            Err(err) => {
+                let new_type = if config.sock_type_hint == SockType::DGRAM {
+                    SockType::RAW
+                } else {
+                    SockType::DGRAM
+                };
+
+                debug!(
+                    "error opening {:?} type socket, trying {:?}: {:?}",
+                    config.sock_type_hint, new_type, err
+                );
+
+                Ok((new_type, Socket::new(domain, new_type, proto)?))
+            }
+        }
+    }
+
+    pub async fn recv_from(&self, buf: &mut [u8]) -> io::Result<(usize, SocketAddr)> {
         self.inner.recv_from(buf).await
     }
 
-    pub(crate) async fn send_to(&self, buf: &mut [u8], target: &SocketAddr) -> io::Result<usize> {
+    pub async fn send_to(&self, buf: &mut [u8], target: &SocketAddr) -> io::Result<usize> {
         self.inner.send_to(buf, target).await
+    }
+
+    pub fn local_addr(&self) -> io::Result<SocketAddr> {
+        self.inner.local_addr()
+    }
+
+    pub fn get_type(&self) -> SockType {
+        self.sock_type
+    }
+
+    #[cfg(unix)]
+    pub fn get_native_sock(&self) -> RawFd {
+        self.inner.as_raw_fd()
+    }
+
+    #[cfg(windows)]
+    pub fn get_native_sock(&self) -> RawSocket {
+        self.inner.as_raw_socket()
     }
 }
 
 #[derive(PartialEq, Eq, Hash)]
-struct ReplyToken(IpAddr, PingIdentifier, PingSequence);
+struct ReplyToken(IpAddr, Option<PingIdentifier>, PingSequence);
 
 pub(crate) struct Reply {
     pub timestamp: Instant,
@@ -91,7 +149,7 @@ impl ReplyMap {
     pub fn new_waiter(
         &self,
         host: IpAddr,
-        ident: PingIdentifier,
+        ident: Option<PingIdentifier>,
         seq: PingSequence,
     ) -> Result<oneshot::Receiver<Reply>, SurgeError> {
         let (tx, rx) = oneshot::channel();
@@ -110,7 +168,7 @@ impl ReplyMap {
     pub(crate) fn remove(
         &self,
         host: IpAddr,
-        ident: PingIdentifier,
+        ident: Option<PingIdentifier>,
         seq: PingSequence,
     ) -> Option<oneshot::Sender<Reply>> {
         self.0.lock().remove(&ReplyToken(host, ident, seq))
@@ -155,6 +213,11 @@ impl Client {
     pub async fn pinger(&self, host: IpAddr, ident: PingIdentifier) -> Pinger {
         Pinger::new(host, ident, self.socket.clone(), self.reply_map.clone())
     }
+
+    /// Expose the underlying socket, if user wants to modify any options on it
+    pub fn get_socket(&self) -> AsyncSocket {
+        self.socket.clone()
+    }
 }
 
 async fn recv_task(socket: AsyncSocket, reply_map: ReplyMap) {
@@ -163,10 +226,21 @@ async fn recv_task(socket: AsyncSocket, reply_map: ReplyMap) {
         if let Ok((sz, addr)) = socket.recv_from(&mut buf).await {
             let timestamp = Instant::now();
             let message = &buf[..sz];
+            let local_addr = socket.local_addr().unwrap().ip();
             let packet = {
                 let result = match addr.ip() {
-                    IpAddr::V4(_addr) => Icmpv4Packet::decode(message).map(IcmpPacket::V4),
-                    IpAddr::V6(addr) => Icmpv6Packet::decode(message, addr).map(IcmpPacket::V6),
+                    IpAddr::V4(src_addr) => {
+                        let local_addr_ip4 = match local_addr {
+                            IpAddr::V4(local_addr_ip4) => local_addr_ip4,
+                            _ => continue,
+                        };
+
+                        Icmpv4Packet::decode(message, socket.sock_type, src_addr, local_addr_ip4)
+                            .map(IcmpPacket::V4)
+                    }
+                    IpAddr::V6(src_addr) => {
+                        Icmpv6Packet::decode(message, src_addr).map(IcmpPacket::V6)
+                    }
                 };
                 match result {
                     Ok(packet) => packet,
@@ -176,9 +250,14 @@ async fn recv_task(socket: AsyncSocket, reply_map: ReplyMap) {
                     }
                 }
             };
-            if let Some(waiter) =
-                reply_map.remove(addr.ip(), packet.get_identifier(), packet.get_sequence())
-            {
+
+            let ident = if is_linux_icmp_socket!(socket.get_type()) {
+                None
+            } else {
+                Some(packet.get_identifier())
+            };
+
+            if let Some(waiter) = reply_map.remove(addr.ip(), ident, packet.get_sequence()) {
                 // If send fails the receiving end has closed. Nothing to do.
                 let _ = waiter.send(Reply { timestamp, packet });
             } else {

@@ -26,7 +26,7 @@ pub enum SurgeError {
     #[error("Multiple identical request")]
     IdenticalRequests {
         host: IpAddr,
-        ident: PingIdentifier,
+        ident: Option<PingIdentifier>,
         seq: PingSequence,
     },
 }

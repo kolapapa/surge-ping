@@ -46,7 +46,7 @@ async fn ping(client: Client, addr: IpAddr) {
         interval.tick().await;
         match pinger.ping(PingSequence(idx), &payload).await {
             Ok((IcmpPacket::V4(packet), dur)) => println!(
-                "No.{}: {} bytes from {}: icmp_seq={} ttl={} time={:0.2?}",
+                "No.{}: {} bytes from {}: icmp_seq={} ttl={:?} time={:0.2?}",
                 idx,
                 packet.get_size(),
                 packet.get_source(),

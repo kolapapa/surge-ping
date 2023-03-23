@@ -6,7 +6,7 @@ mod ping;
 
 use std::{net::IpAddr, time::Duration};
 
-pub use client::Client;
+pub use client::{AsyncSocket, Client};
 pub use config::{Config, ConfigBuilder};
 pub use error::SurgeError;
 pub use icmp::{

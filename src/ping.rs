@@ -9,12 +9,13 @@ use crate::{
     client::{AsyncSocket, ReplyMap},
     error::{Result, SurgeError},
     icmp::{icmpv4, icmpv6, IcmpPacket, PingIdentifier, PingSequence},
+    is_linux_icmp_socket,
 };
 
 /// A Ping struct represents the state of one particular ping instance.
 pub struct Pinger {
     pub host: IpAddr,
-    pub ident: PingIdentifier,
+    pub ident: Option<PingIdentifier>,
     timeout: Duration,
     socket: AsyncSocket,
     reply_map: ReplyMap,
@@ -34,10 +35,16 @@ impl Drop for Pinger {
 impl Pinger {
     pub(crate) fn new(
         host: IpAddr,
-        ident: PingIdentifier,
+        ident_hint: PingIdentifier,
         socket: AsyncSocket,
         response_map: ReplyMap,
     ) -> Pinger {
+        let ident = if is_linux_icmp_socket!(socket.get_type()) {
+            None
+        } else {
+            Some(ident_hint)
+        };
+
         Pinger {
             host,
             ident,
@@ -63,19 +70,14 @@ impl Pinger {
         // Register to wait for a reply.
         let reply_waiter = self.reply_map.new_waiter(self.host, self.ident, seq)?;
 
-        // Create and send ping packet.
-        let mut packet = match self.host {
-            IpAddr::V4(_) => icmpv4::make_icmpv4_echo_packet(self.ident, seq, payload)?,
-            IpAddr::V6(_) => icmpv6::make_icmpv6_echo_packet(self.ident, seq, payload)?,
-        };
-        self.socket
-            .send_to(&mut packet, &SocketAddr::new(self.host, 0))
-            .await?;
+        // Send actual packet
+        self.send_ping(seq, payload).await?;
+
         let send_time = Instant::now();
         self.last_sequence = Some(seq);
 
         // Wait for reply or timeout.
-        let result = match timeout(self.timeout, reply_waiter).await {
+        match timeout(self.timeout, reply_waiter).await {
             Ok(Ok(reply)) => Ok((
                 reply.packet,
                 reply.timestamp.saturating_duration_since(send_time),
@@ -85,7 +87,30 @@ impl Pinger {
                 self.reply_map.remove(self.host, self.ident, seq);
                 Err(SurgeError::Timeout { seq })
             }
+        }
+    }
+
+    /// Send a ping packet (useful, when you don't need a reply).
+    pub async fn send_ping(&self, seq: PingSequence, payload: &[u8]) -> Result<()> {
+        // Create and send ping packet.
+        let mut packet = match self.host {
+            IpAddr::V4(_) => icmpv4::make_icmpv4_echo_packet(
+                self.ident.unwrap_or(PingIdentifier(0)),
+                seq,
+                self.socket.get_type(),
+                payload,
+            )?,
+            IpAddr::V6(_) => icmpv6::make_icmpv6_echo_packet(
+                self.ident.unwrap_or(PingIdentifier(0)),
+                seq,
+                payload,
+            )?,
         };
-        result
+
+        self.socket
+            .send_to(&mut packet, &SocketAddr::new(self.host, 0))
+            .await?;
+
+        Ok(())
     }
 }
