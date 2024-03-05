@@ -71,7 +71,10 @@ impl Pinger {
         let reply_waiter = self.reply_map.new_waiter(self.host, self.ident, seq)?;
 
         // Send actual packet
-        self.send_ping(seq, payload).await?;
+        if let Err(e) = self.send_ping(seq, payload).await {
+            self.reply_map.remove(self.host, self.ident, seq);
+            return Err(e);
+        }
 
         let send_time = Instant::now();
         self.last_sequence = Some(seq);
