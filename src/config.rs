@@ -1,5 +1,6 @@
 use std::net::SocketAddr;
 
+use pnet_packet::ipv4::Ipv4Flags::DontFragment;
 use socket2::{SockAddr, Type};
 
 use crate::ICMP;
@@ -14,6 +15,7 @@ pub struct Config {
     pub interface: Option<String>,
     pub ttl: Option<u32>,
     pub fib: Option<u32>,
+    pub dont_fragment: bool,
 }
 
 impl Default for Config {
@@ -25,6 +27,7 @@ impl Default for Config {
             interface: None,
             ttl: None,
             fib: None,
+            dont_fragment: false,
         }
     }
 }
@@ -48,6 +51,7 @@ pub struct ConfigBuilder {
     interface: Option<String>,
     ttl: Option<u32>,
     fib: Option<u32>,
+    dont_fragment: bool,
 }
 
 impl Default for ConfigBuilder {
@@ -59,6 +63,7 @@ impl Default for ConfigBuilder {
             interface: None,
             ttl: None,
             fib: None,
+            dont_fragment: false,
         }
     }
 }
@@ -109,6 +114,12 @@ impl ConfigBuilder {
         self
     }
 
+    /// Determine whether the don't fragment flag is set on outgoing ICMP packets
+    pub fn dont_fragment(mut self, dont_fragment: bool) -> Self {
+        self.dont_fragment = dont_fragment;
+        self
+    }
+
     pub fn build(self) -> Config {
         Config {
             sock_type_hint: self.sock_type_hint,
@@ -117,6 +128,7 @@ impl ConfigBuilder {
             interface: self.interface,
             ttl: self.ttl,
             fib: self.fib,
+            dont_fragment: self.dont_fragment,
         }
     }
 }

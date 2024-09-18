@@ -19,6 +19,10 @@ socket2 = { version = "0.5.6", features = ["all"] }
 thiserror = "1.0.57"
 tokio = { version = "1.36", features = ["time", "sync", "net", "rt"] }
 tracing = "0.1.40"
+windows-sys = { version = "0.59.0", features = ["Win32_Networking_WinSock"] }
+
+[target.'cfg(target_os = "windows")'.dependencies]
+windows-sys = "0.59.0"
 
 
 [dev-dependencies]

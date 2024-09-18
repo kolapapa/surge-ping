@@ -19,6 +19,9 @@ struct Opt {
     /// destination is a multicast address.
     #[structopt(short = "I", long)]
     iface: Option<String>,
+
+    #[structopt(short = "d", long)]
+    dont_fragment: bool
 }
 
 #[tokio::main]
@@ -38,6 +41,8 @@ async fn main() {
     if let Some(interface) = opt.iface {
         config_builder = config_builder.interface(&interface);
     }
+
+    config_builder = config_builder.dont_fragment(opt.dont_fragment);
 
     if ip.is_ipv6() {
         config_builder = config_builder.kind(ICMP::V6);
