@@ -41,10 +41,6 @@ impl Config {
     pub fn builder() -> ConfigBuilder {
         ConfigBuilder::default()
     }
-
-    pub(crate) fn ipv4_flags(&self) -> Option<u8> {
-        self.dont_fragment.then_some(DontFragment)
-    }
 }
 
 #[derive(Debug)]

@@ -1,10 +1,9 @@
-use pnet_packet::ipv4::MutableIpv4Packet;
 use socket2::Type as SockType;
 use std::convert::TryInto;
 use std::net::Ipv4Addr;
 
 use pnet_packet::icmp::{self, IcmpCode, IcmpType};
-use pnet_packet::{Packet, MutablePacket};
+use pnet_packet::Packet;
 use pnet_packet::{ipv4, PacketSize};
 
 use crate::{
