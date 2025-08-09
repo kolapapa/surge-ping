@@ -60,7 +60,7 @@ impl AsyncSocket {
             socket.bind_device(Some(interface.as_bytes()))?;
         }
         if let Some(ttl) = config.ttl {
-            socket.set_ttl(ttl)?;
+            socket.set_ttl_v4(ttl)?;
         }
         #[cfg(target_os = "freebsd")]
         if let Some(fib) = config.fib {
