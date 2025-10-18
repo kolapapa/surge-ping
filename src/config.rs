@@ -1,4 +1,4 @@
-use std::net::SocketAddr;
+use std::{net::SocketAddr, num::NonZeroU32};
 
 use socket2::{SockAddr, Type};
 
@@ -12,6 +12,7 @@ pub struct Config {
     pub kind: ICMP,
     pub bind: Option<SockAddr>,
     pub interface: Option<String>,
+    pub interface_index: Option<NonZeroU32>,
     pub ttl: Option<u32>,
     pub fib: Option<u32>,
 }
@@ -23,6 +24,7 @@ impl Default for Config {
             kind: ICMP::default(),
             bind: None,
             interface: None,
+            interface_index: None,
             ttl: None,
             fib: None,
         }
@@ -46,6 +48,7 @@ pub struct ConfigBuilder {
     kind: ICMP,
     bind: Option<SockAddr>,
     interface: Option<String>,
+    interface_index: Option<NonZeroU32>,
     ttl: Option<u32>,
     fib: Option<u32>,
 }
@@ -57,6 +60,7 @@ impl Default for ConfigBuilder {
             kind: ICMP::default(),
             bind: None,
             interface: None,
+            interface_index: None,
             ttl: None,
             fib: None,
         }
@@ -80,6 +84,12 @@ impl ConfigBuilder {
     /// works for some socket types, particularly `AF_INET` sockets.
     pub fn interface(mut self, interface: &str) -> Self {
         self.interface = Some(interface.to_string());
+        self
+    }
+
+    /// Sets the value for the `IP_BOUND_IF`, `IPV6_BOUND_IF` or `SO_BINDTOIFINDEX` option on this socket depending on the platform and IP address family.
+    pub fn interface_index(mut self, interface_index: NonZeroU32) -> Self {
+        self.interface_index = Some(interface_index);
         self
     }
 
@@ -115,6 +125,7 @@ impl ConfigBuilder {
             kind: self.kind,
             bind: self.bind,
             interface: self.interface,
+            interface_index: self.interface_index,
             ttl: self.ttl,
             fib: self.fib,
         }

@@ -59,6 +59,25 @@ impl AsyncSocket {
         if let Some(interface) = &config.interface {
             socket.bind_device(Some(interface.as_bytes()))?;
         }
+        #[cfg(any(
+            target_os = "ios",
+            target_os = "visionos",
+            target_os = "macos",
+            target_os = "tvos",
+            target_os = "watchos",
+            target_os = "illumos",
+            target_os = "solaris",
+            target_os = "linux",
+            target_os = "android",
+        ))]
+        {
+            if config.interface_index.is_some() {
+                match config.kind {
+                    ICMP::V4 => socket.bind_device_by_index_v4(config.interface_index)?,
+                    ICMP::V6 => socket.bind_device_by_index_v6(config.interface_index)?,
+                }
+            }
+        }
         if let Some(ttl) = config.ttl {
             match config.kind {
                 ICMP::V4 => socket.set_ttl_v4(ttl)?,
