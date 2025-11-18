@@ -2,10 +2,12 @@
 use std::os::unix::io::{AsRawFd, FromRawFd, IntoRawFd, RawFd};
 #[cfg(windows)]
 use std::os::windows::io::{AsRawSocket, FromRawSocket, IntoRawSocket, RawSocket};
+#[cfg(windows)]
+use windows_sys::Win32::Networking::WinSock::{setsockopt, IPPROTO_IP, IP_DONTFRAGMENT};
 
 use std::{
     collections::HashMap,
-    io,
+    io, mem,
     net::{IpAddr, SocketAddr},
     sync::Arc,
     time::Instant,
@@ -51,6 +53,10 @@ impl AsyncSocket {
     pub fn new(config: &Config) -> io::Result<Self> {
         let (sock_type, socket) = Self::create_socket(config)?;
 
+        if config.dont_fragment {
+            Self::set_dontfragment(&socket);
+        }
+
         socket.set_nonblocking(true)?;
         if let Some(sock_addr) = &config.bind {
             socket.bind(sock_addr)?;
@@ -95,10 +101,25 @@ impl AsyncSocket {
         #[cfg(unix)]
         let socket =
             UdpSocket::from_std(unsafe { std::net::UdpSocket::from_raw_fd(socket.into_raw_fd()) })?;
+
         Ok(Self {
             inner: Arc::new(socket),
             sock_type,
         })
+    }
+
+    #[cfg(windows)]
+    fn set_dontfragment(socket: &Socket) {
+        // SAFETY: socket2 will give us a valid socket handle. All other arguments are constant.
+        unsafe {
+            setsockopt(
+                socket.as_raw_socket() as _,
+                IPPROTO_IP,
+                IP_DONTFRAGMENT,
+                &1,
+                mem::size_of::<u8>() as i32,
+            );
+        }
     }
 
     fn create_socket(config: &Config) -> io::Result<(SockType, Socket)> {
