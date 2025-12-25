@@ -131,3 +131,138 @@ impl ConfigBuilder {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::net::{IpAddr, Ipv4Addr, SocketAddr};
+
+    #[test]
+    fn test_config_default() {
+        let config = Config::default();
+        assert_eq!(config.kind, ICMP::V4);
+        assert_eq!(config.sock_type_hint, Type::DGRAM);
+        assert!(config.bind.is_none());
+        assert!(config.interface.is_none());
+        assert!(config.interface_index.is_none());
+        assert!(config.ttl.is_none());
+        assert!(config.fib.is_none());
+    }
+
+    #[test]
+    fn test_config_builder_kind() {
+        let config = ConfigBuilder::default().kind(ICMP::V6).build();
+        assert_eq!(config.kind, ICMP::V6);
+    }
+
+    #[test]
+    fn test_config_builder_ttl() {
+        let config = ConfigBuilder::default().ttl(64).build();
+        assert_eq!(config.ttl, Some(64));
+    }
+
+    #[test]
+    fn test_config_builder_bind() {
+        let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0);
+        let config = ConfigBuilder::default().bind(addr).build();
+        assert!(config.bind.is_some());
+    }
+
+    #[test]
+    fn test_config_builder_interface() {
+        let config = ConfigBuilder::default().interface("eth0").build();
+        assert_eq!(config.interface, Some("eth0".to_string()));
+    }
+
+    #[test]
+    fn test_config_builder_sock_type_hint() {
+        let config = ConfigBuilder::default().sock_type_hint(Type::RAW).build();
+        assert_eq!(config.sock_type_hint, Type::RAW);
+    }
+
+    #[test]
+    fn test_config_builder_fib() {
+        let config = ConfigBuilder::default().fib(100).build();
+        assert_eq!(config.fib, Some(100));
+    }
+
+    #[test]
+    fn test_config_builder_interface_index() {
+        let index = NonZeroU32::new(1).unwrap();
+        let config = ConfigBuilder::default().interface_index(index).build();
+        assert_eq!(config.interface_index, Some(index));
+    }
+
+    #[test]
+    fn test_config_builder_chained() {
+        let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), 0);
+        let index = NonZeroU32::new(1).unwrap();
+
+        let config = ConfigBuilder::default()
+            .kind(ICMP::V6)
+            .ttl(128)
+            .bind(addr)
+            .interface("eth0")
+            .interface_index(index)
+            .sock_type_hint(Type::RAW)
+            .fib(200)
+            .build();
+
+        assert_eq!(config.kind, ICMP::V6);
+        assert_eq!(config.ttl, Some(128));
+        assert!(config.bind.is_some());
+        assert_eq!(config.interface, Some("eth0".to_string()));
+        assert_eq!(config.interface_index, Some(index));
+        assert_eq!(config.sock_type_hint, Type::RAW);
+        assert_eq!(config.fib, Some(200));
+    }
+
+    #[test]
+    fn test_config_build_preserves_all_fields() {
+        let addr = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(192, 168, 1, 1)), 8080);
+        let index = NonZeroU32::new(5).unwrap();
+
+        let config = ConfigBuilder::default()
+            .kind(ICMP::V4)
+            .ttl(64)
+            .bind(addr)
+            .interface("wlan0")
+            .interface_index(index)
+            .sock_type_hint(Type::DGRAM)
+            .fib(50)
+            .build();
+
+        assert_eq!(config.kind, ICMP::V4);
+        assert_eq!(config.ttl, Some(64));
+        assert!(config.bind.is_some());
+        assert_eq!(config.interface, Some("wlan0".to_string()));
+        assert_eq!(config.interface_index, Some(index));
+        assert_eq!(config.sock_type_hint, Type::DGRAM);
+        assert_eq!(config.fib, Some(50));
+    }
+
+    #[test]
+    fn test_icmp_default() {
+        assert_eq!(ICMP::default(), ICMP::V4);
+    }
+
+    #[test]
+    fn test_config_preserves_none_values() {
+        let config = ConfigBuilder::default().build();
+        assert!(config.bind.is_none());
+        assert!(config.interface.is_none());
+        assert!(config.interface_index.is_none());
+        assert!(config.ttl.is_none());
+        assert!(config.fib.is_none());
+    }
+
+    #[test]
+    fn test_config_builder_multiple_calls() {
+        // Test that builder methods can be called multiple times
+        let config = ConfigBuilder::default()
+            .ttl(64)
+            .ttl(128)
+            .build();
+        assert_eq!(config.ttl, Some(128)); // Last call wins
+    }
+}
