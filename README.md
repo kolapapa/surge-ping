@@ -67,6 +67,51 @@ round-trip min/avg/max/stddev = 65.865/76.897/109.902/16.734 ms
 
 If you are **time sensitive**, please do not use `asynchronous ping program`, because if there are a large number of asynchronous events waiting to wake up, it will cause inaccurate calculation time. You can directly use the `ping command` of the operating system.
 
+## Non-privileged Ping (Linux)
+
+On Linux systems (kernel 2.6.30+), `surge-ping` supports **non-privileged ICMP** datagram sockets, allowing ping operations without root privileges or `CAP_NET_RAW` capability.
+
+### How it works
+
+The library automatically tries socket types in this order:
+1. **DGRAM socket** (non-privileged, works on Linux with ICMP ECHO restriction)
+2. **RAW socket** (requires root/CAP_NET_RAW, fallback on other systems)
+
+This means it works out of the box for most Linux users without special permissions.
+
+### System Configuration
+
+If non-privileged ping is not working, check your system configuration:
+
+```bash
+# Check if non-privileged ICMP is enabled
+sysctl net.ipv4.ping_group_range
+
+# Typical output: "0   2147483647" (enabled for all groups)
+# If output is "1   0", it's disabled
+```
+
+To enable non-privileged ping temporarily:
+```bash
+sudo sysctl -w net.ipv4.ping_group_range="0 2147483647"
+```
+
+To make the change persistent:
+```bash
+echo "net.ipv4.ping_group_range=0 2147483647" | sudo tee -a /etc/sysctl.conf
+sudo sysctl -p
+```
+
+### Troubleshooting
+
+If you encounter "Permission denied" errors:
+1. Check `net.ipv4.ping_group_range` as shown above
+2. Some container environments may have additional restrictions
+3. As a fallback, run with `sudo` or add `CAP_NET_RAW` capability:
+   ```bash
+   sudo setcap cap_net_raw+ep your-binary
+   ```
+
 ## License
 
 This project is licensed under the [MIT license].
