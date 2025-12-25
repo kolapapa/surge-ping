@@ -1,3 +1,4 @@
+use std::net::SocketAddr;
 use std::time::Duration;
 
 use structopt::StructOpt;
@@ -26,11 +27,10 @@ async fn main() {
     pretty_env_logger::init();
     let opt = Opt::from_args();
 
-    let ip = tokio::net::lookup_host(format!("{}:0", opt.host))
+    let host = tokio::net::lookup_host(format!("{}:0", opt.host))
         .await
         .expect("host lookup error")
         .next()
-        .map(|val| val.ip())
         .unwrap();
 
     let mut config_builder = Config::builder();
@@ -39,14 +39,17 @@ async fn main() {
         config_builder = config_builder.interface(&interface);
     }
 
-    if ip.is_ipv6() {
+    if host.is_ipv6() {
         config_builder = config_builder.kind(ICMP::V6);
     }
     let config = config_builder.build();
 
     let payload = vec![0; opt.size];
     let client = Client::new(&config).unwrap();
-    let mut pinger = client.pinger(ip, PingIdentifier(111)).await;
+    let mut pinger = client.pinger(host.ip(), PingIdentifier(111)).await;
+    if let SocketAddr::V6(addr) = host {
+        pinger.scope_id(addr.scope_id());
+    }
     pinger.timeout(Duration::from_secs(1));
     match pinger.ping(PingSequence(0), &payload).await {
         Ok((packet, rtt)) => {
