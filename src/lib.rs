@@ -15,7 +15,7 @@ pub use icmp::{
 pub use ping::Pinger;
 use rand::random;
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ICMP {
     V4,
     V6,
