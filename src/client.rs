@@ -108,21 +108,45 @@ impl AsyncSocket {
             ICMP::V6 => (Domain::IPV6, Some(Protocol::ICMPV6)),
         };
 
-        match Socket::new(domain, config.sock_type_hint, proto) {
-            Ok(sock) => Ok((config.sock_type_hint, sock)),
-            Err(err) => {
-                let new_type = if config.sock_type_hint == SockType::DGRAM {
-                    SockType::RAW
-                } else {
-                    SockType::DGRAM
-                };
+        let first_err = match Socket::new(domain, config.sock_type_hint, proto) {
+            Ok(sock) => return Ok((config.sock_type_hint, sock)),
+            Err(err) => err,
+        };
 
-                debug!(
-                    "error opening {:?} type socket, trying {:?}: {:?}",
-                    config.sock_type_hint, new_type, err
-                );
+        let fallback_type = if config.sock_type_hint == SockType::DGRAM {
+            SockType::RAW
+        } else {
+            SockType::DGRAM
+        };
 
-                Ok((new_type, Socket::new(domain, new_type, proto)?))
+        debug!(
+            "error opening {:?} type socket, trying {:?}: {:?}",
+            config.sock_type_hint, fallback_type, first_err
+        );
+
+        match Socket::new(domain, fallback_type, proto) {
+            Ok(sock) => Ok((fallback_type, sock)),
+            Err(_second_err) => {
+                #[cfg(all(target_os = "linux", any(target_arch = "x86", target_arch = "x86_64", target_arch = "arm", target_arch = "aarch64")))]
+                {
+                    if config.sock_type_hint == SockType::DGRAM
+                        && first_err.kind() == io::ErrorKind::PermissionDenied
+                    {
+                        return Err(io::Error::new(
+                            io::ErrorKind::PermissionDenied,
+                            format!(
+                                "Permission denied creating ICMP socket. On Linux, you may need to:\n\
+                                1. Enable non-privileged ICMP: `sudo sysctl -w net.ipv{}.ping_group_range=\"0 2147483647\"`\n\
+                                2. Run with sudo or set CAP_NET_RAW: `sudo setcap cap_net_raw+ep <binary>`\n\
+                                Original error: {}",
+                                if config.kind == ICMP::V4 { "4" } else { "6" },
+                                first_err
+                            ),
+                        ));
+                    }
+                }
+
+                Err(first_err)
             }
         }
     }
