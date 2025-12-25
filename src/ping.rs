@@ -16,6 +16,7 @@ use crate::{
 pub struct Pinger {
     pub host: IpAddr,
     pub ident: Option<PingIdentifier>,
+    scope_id: u32,
     timeout: Duration,
     socket: AsyncSocket,
     reply_map: ReplyMap,
@@ -48,11 +49,18 @@ impl Pinger {
         Pinger {
             host,
             ident,
+            scope_id: 0,
             timeout: Duration::from_secs(2),
             socket,
             reply_map: response_map,
             last_sequence: None,
         }
+    }
+
+    /// The scope id of the IPv6 socket address.
+    pub fn scope_id(&mut self, scope_id: u32) -> &mut Pinger {
+        self.scope_id = scope_id;
+        self
     }
 
     /// The timeout of each Ping, in seconds. (default: 2s)
@@ -110,9 +118,12 @@ impl Pinger {
             )?,
         };
 
-        self.socket
-            .send_to(&mut packet, &SocketAddr::new(self.host, 0))
-            .await?;
+        let mut target = SocketAddr::new(self.host, 0);
+        if let SocketAddr::V6(sa) = &mut target {
+            sa.set_scope_id(self.scope_id);
+        }
+
+        self.socket.send_to(&mut packet, &target).await?;
 
         Ok(())
     }
