@@ -29,6 +29,8 @@ pub enum SurgeError {
         ident: Option<PingIdentifier>,
         seq: PingSequence,
     },
+    #[error("Client has been destroyed, ping operations are no longer available")]
+    ClientDestroyed,
 }
 
 #[derive(Error, Debug)]

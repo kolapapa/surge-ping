@@ -7,6 +7,7 @@ use std::{
     collections::HashMap,
     io,
     net::{IpAddr, SocketAddr},
+    sync::atomic::{AtomicBool, Ordering},
     sync::Arc,
     time::Instant,
 };
@@ -161,8 +162,20 @@ pub(crate) struct Reply {
     pub packet: IcmpPacket,
 }
 
-#[derive(Clone, Default)]
-pub(crate) struct ReplyMap(Arc<Mutex<HashMap<ReplyToken, oneshot::Sender<Reply>>>>);
+#[derive(Clone)]
+pub(crate) struct ReplyMap {
+    inner: Arc<Mutex<HashMap<ReplyToken, oneshot::Sender<Reply>>>>,
+    alive: Arc<AtomicBool>,
+}
+
+impl Default for ReplyMap {
+    fn default() -> Self {
+        Self {
+            inner: Arc::new(Mutex::new(HashMap::new())),
+            alive: Arc::new(AtomicBool::new(true)),
+        }
+    }
+}
 
 impl ReplyMap {
     /// Register to wait for a reply from host with ident and sequence number.
@@ -174,9 +187,12 @@ impl ReplyMap {
         ident: Option<PingIdentifier>,
         seq: PingSequence,
     ) -> Result<oneshot::Receiver<Reply>, SurgeError> {
+        if !self.alive.load(Ordering::Relaxed) {
+            return Err(SurgeError::ClientDestroyed);
+        }
         let (tx, rx) = oneshot::channel();
         if self
-            .0
+            .inner
             .lock()
             .insert(ReplyToken(host, ident, seq), tx)
             .is_some()
@@ -193,7 +209,12 @@ impl ReplyMap {
         ident: Option<PingIdentifier>,
         seq: PingSequence,
     ) -> Option<oneshot::Sender<Reply>> {
-        self.0.lock().remove(&ReplyToken(host, ident, seq))
+        self.inner.lock().remove(&ReplyToken(host, ident, seq))
+    }
+
+    /// Mark the client as destroyed. This is called when the Client is dropped.
+    pub(crate) fn mark_destroyed(&self) {
+        self.alive.store(false, Ordering::Relaxed);
     }
 }
 
@@ -210,6 +231,9 @@ pub struct Client {
 
 impl Drop for Client {
     fn drop(&mut self) {
+        // Mark the reply_map as destroyed so any pending or new ping operations
+        // will fail with ClientDestroyed error instead of timing out.
+        self.reply_map.mark_destroyed();
         // The client may pass through multiple tasks, so need to judge whether the number of references is 1.
         if Arc::strong_count(&self.recv) <= 1 {
             self.recv.abort();
