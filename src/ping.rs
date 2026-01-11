@@ -5,6 +5,8 @@ use std::{
 
 use tokio::time::timeout;
 
+use tokio::task::JoinHandle;
+
 use crate::{
     client::{AsyncSocket, ReplyMap},
     error::{Result, SurgeError},
@@ -21,6 +23,8 @@ pub struct Pinger {
     socket: AsyncSocket,
     reply_map: ReplyMap,
     last_sequence: Option<PingSequence>,
+    #[allow(dead_code)]
+    recv: std::sync::Arc<JoinHandle<()>>,
 }
 
 impl Drop for Pinger {
@@ -39,6 +43,7 @@ impl Pinger {
         ident_hint: PingIdentifier,
         socket: AsyncSocket,
         response_map: ReplyMap,
+        recv: std::sync::Arc<JoinHandle<()>>,
     ) -> Pinger {
         let ident = if is_linux_icmp_socket!(socket.get_type()) {
             None
@@ -54,6 +59,7 @@ impl Pinger {
             socket,
             reply_map: response_map,
             last_sequence: None,
+            recv,
         }
     }
 

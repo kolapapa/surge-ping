@@ -1,5 +1,5 @@
 use surge_ping::{
-    Client, Config, IcmpPacket, ICMP, PingIdentifier, PingSequence, SurgeError,
+    Client, Config, ICMP, PingIdentifier, PingSequence, SurgeError,
 };
 use std::net::IpAddr;
 use std::time::Duration;
