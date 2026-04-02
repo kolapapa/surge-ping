@@ -2,7 +2,8 @@
 name = "surge-ping"
 version = "0.8.4"
 authors = ["kolapapa <kolapapa2021@gmail.com>"]
-edition = "2018"
+edition = "2024"
+rust-version = "1.85.0"
 license = "MIT"
 homepage = "https://github.com/kolapapa/surge-ping"
 repository = "https://github.com/kolapapa/surge-ping"
