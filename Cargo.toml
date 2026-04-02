@@ -12,12 +12,12 @@ categories = ["network-programming", "asynchronous"]
 
 [dependencies]
 hex = "0.4.3"
-parking_lot = "0.12.5"
+parking_lot = "0.12.1"
 pnet_packet = "0.35"
-rand = "0.10.0"
+rand = "0.10"
 socket2 = { version = "0.6", features = ["all"] }
-thiserror = "2.0.18"
-tokio = { version = "1.50", features = ["time", "sync", "net", "rt"] }
+thiserror = "2.0"
+tokio = { version = "1.36", features = ["time", "sync", "net", "rt"] }
 tracing = "0.1.44"
 
 
@@ -25,7 +25,7 @@ tracing = "0.1.44"
 structopt = "0.3.26"
 pretty_env_logger = "0.5.0"
 tokio = { version = "1", features = ["full"] }
-futures = "0.3.32"
+futures = "0.3.25"
 
 [[example]]
 name = "simple"
