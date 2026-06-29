@@ -1,6 +1,6 @@
 [package]
 name = "surge-ping"
-version = "0.8.4"
+version = "0.9.0"
 authors = ["kolapapa <kolapapa2021@gmail.com>"]
 edition = "2024"
 rust-version = "1.85.0"
