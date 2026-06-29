@@ -1,5 +1,5 @@
 use surge_ping::{
-    Client, Config, IcmpPacket, ICMP, PingIdentifier, PingSequence, SurgeError,
+    Client, Config, ICMP, PingIdentifier, PingSequence, SurgeError,
 };
 use std::net::IpAddr;
 use std::time::Duration;
@@ -119,11 +119,10 @@ async fn test_ping_multiple_sequences() {
         }
     }
 
-    // At least one should succeed on localhost
-    assert!(
-        successful_pings > 0 || true, // Allow all to timeout on some systems
-        "Expected at least one successful ping"
-    );
+    // We don't assert on successful_pings: on some CI/sandbox environments every
+    // sequence may legitimately time out. The loop above already fails the test
+    // if any sequence returns an unexpected (non-timeout) error.
+    let _ = successful_pings;
 }
 
 #[tokio::test]
