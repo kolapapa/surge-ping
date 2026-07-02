@@ -255,11 +255,11 @@ pub struct Client {
 
 impl Drop for Client {
     fn drop(&mut self) {
-        // Mark the reply_map as destroyed so any pending or new ping operations
-        // will fail with ClientDestroyed error instead of timing out.
-        self.reply_map.mark_destroyed();
         // The client may pass through multiple tasks, so need to judge whether the number of references is 1.
         if Arc::strong_count(&self.recv) <= 1 {
+            // Mark the reply_map as destroyed so any pending or new ping operations
+            // will fail with ClientDestroyed error instead of timing out.
+            self.reply_map.mark_destroyed();
             self.recv.abort();
         }
     }
@@ -281,7 +281,13 @@ impl Client {
 
     /// Create a `Pinger` instance, you can make special configuration for this instance.
     pub async fn pinger(&self, host: IpAddr, ident: PingIdentifier) -> Pinger {
-        Pinger::new(host, ident, self.socket.clone(), self.reply_map.clone())
+        Pinger::new(
+            host,
+            ident,
+            self.socket.clone(),
+            self.reply_map.clone(),
+            self.recv.clone(),
+        )
     }
 
     /// Expose the underlying socket, if user wants to modify any options on it
