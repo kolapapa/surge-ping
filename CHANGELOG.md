@@ -65,6 +65,10 @@ A bug-fix release. No public API was changed or removed.
   packet-decoding tests need no ICMP socket and are fully deterministic; the
   API-level tests are separate and skip where the environment cannot reach
   TEST-NET-1.
+- Tests no longer assume a platform. Two of them asserted that a `Pinger` keeps
+  the identifier hint it was given, which does not hold on Linux ICMP sockets
+  where the kernel owns the identifier; they now derive the expectation the same
+  way the library does.
 - A GitHub Actions workflow covering rustfmt, clippy, docs, the declared MSRV of
   1.85.0, `cargo audit`, and a build matrix over Linux, macOS and Windows. Tests
   requiring a real ICMP socket run in their own job.

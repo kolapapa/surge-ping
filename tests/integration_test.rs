@@ -1,6 +1,20 @@
 use std::net::IpAddr;
 use std::time::Duration;
-use surge_ping::{Client, Config, ICMP, PingIdentifier, PingSequence, SurgeError};
+use surge_ping::{
+    Client, Config, ICMP, PingIdentifier, PingSequence, SurgeError, is_linux_icmp_socket,
+};
+
+/// The identifier a `Pinger` ends up with is platform dependent: on a Linux
+/// ICMP socket (SOCK_DGRAM) the kernel owns the identifier and rewrites it, so
+/// the hint is dropped and `ident` is `None`. Everywhere else the hint is kept.
+fn expected_ident(client: &Client, hint: PingIdentifier) -> Option<PingIdentifier> {
+    let sock_type = client.get_socket().get_type();
+    if is_linux_icmp_socket!(sock_type) {
+        None
+    } else {
+        Some(hint)
+    }
+}
 
 #[tokio::test]
 async fn test_client_creation() {
@@ -22,7 +36,7 @@ async fn test_pinger_creation() {
     let pinger = client.pinger(host, PingIdentifier(42)).await;
     // Pinger should be created successfully
     assert_eq!(pinger.host, host);
-    assert_eq!(pinger.ident, Some(PingIdentifier(42)));
+    assert_eq!(pinger.ident, expected_ident(&client, PingIdentifier(42)));
 }
 
 #[tokio::test]
@@ -138,8 +152,8 @@ async fn test_multiple_pingers_same_client() {
     // Both pingers should be created successfully
     assert_eq!(pinger1.host, "127.0.0.1".parse::<IpAddr>().unwrap());
     assert_eq!(pinger2.host, "127.0.0.1".parse::<IpAddr>().unwrap());
-    assert_eq!(pinger1.ident, Some(PingIdentifier(400)));
-    assert_eq!(pinger2.ident, Some(PingIdentifier(401)));
+    assert_eq!(pinger1.ident, expected_ident(&client, PingIdentifier(400)));
+    assert_eq!(pinger2.ident, expected_ident(&client, PingIdentifier(401)));
 }
 
 #[tokio::test]
