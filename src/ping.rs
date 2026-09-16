@@ -20,17 +20,6 @@ pub struct Pinger {
     timeout: Duration,
     socket: AsyncSocket,
     reply_map: ReplyMap,
-    last_sequence: Option<PingSequence>,
-}
-
-impl Drop for Pinger {
-    fn drop(&mut self) {
-        if let Some(sequence) = self.last_sequence.take() {
-            // Ensure no reply waiter is left hanging if this pinger is dropped while
-            // waiting for a reply.
-            self.reply_map.remove(self.host, self.ident, sequence);
-        }
-    }
 }
 
 impl Pinger {
@@ -53,7 +42,6 @@ impl Pinger {
             timeout: Duration::from_secs(2),
             socket,
             reply_map: response_map,
-            last_sequence: None,
         }
     }
 
@@ -75,29 +63,31 @@ impl Pinger {
         seq: PingSequence,
         payload: &[u8],
     ) -> Result<(IcmpPacket, Duration)> {
-        // Register to wait for a reply.
-        let reply_waiter = self.reply_map.new_waiter(self.host, self.ident, seq)?;
+        // Register to wait for a reply. The guard keeps the registration alive
+        // for exactly this scope: every early return below, and every point at
+        // which this future may be cancelled, unregisters it automatically.
+        let mut reply_waiter = self.reply_map.new_waiter(self.host, self.ident, seq)?;
 
         // Send actual packet
-        if let Err(e) = self.send_ping(seq, payload).await {
-            self.reply_map.remove(self.host, self.ident, seq);
-            return Err(e);
-        }
+        self.send_ping(seq, payload).await?;
 
         let send_time = Instant::now();
-        self.last_sequence = Some(seq);
 
         // Wait for reply or timeout.
-        match timeout(self.timeout, reply_waiter).await {
-            Ok(Ok(reply)) => Ok((
-                reply.packet,
-                reply.timestamp.saturating_duration_since(send_time),
-            )),
-            Ok(Err(_err)) => Err(SurgeError::NetworkError),
-            Err(_) => {
-                self.reply_map.remove(self.host, self.ident, seq);
-                Err(SurgeError::Timeout { seq })
+        match timeout(self.timeout, reply_waiter.wait()).await {
+            Ok(Ok(reply)) => {
+                // The receiving task already took the registration out of the
+                // map; releasing ownership here keeps the guard from removing
+                // an entry that now belongs to somebody else.
+                reply_waiter.disarm();
+                Ok((
+                    reply.packet,
+                    reply.timestamp.saturating_duration_since(send_time),
+                ))
             }
+            // `ClientDestroyed` if the client shut down under us, `NetworkError` otherwise.
+            Ok(Err(err)) => Err(err),
+            Err(_) => Err(SurgeError::Timeout { seq }),
         }
     }
 

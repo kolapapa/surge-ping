@@ -1,4 +1,5 @@
 use std::fmt;
+use std::net::IpAddr;
 
 pub mod icmpv4;
 pub mod icmpv6;
@@ -24,6 +25,20 @@ impl IcmpPacket {
         match self {
             IcmpPacket::V4(packet) => packet.get_sequence(),
             IcmpPacket::V6(packet) => packet.get_sequence(),
+        }
+    }
+
+    /// The address the request this packet answers was originally sent to.
+    ///
+    /// For an echo reply that is simply the sender of the packet. For an ICMP
+    /// error (time exceeded, destination unreachable, ...) the packet comes
+    /// from an intermediate router, and the original target is read out of the
+    /// IP header quoted inside the error — which is the address the caller
+    /// asked us to ping, and therefore the one a reply must be routed to.
+    pub fn real_destination(&self) -> IpAddr {
+        match self {
+            IcmpPacket::V4(packet) => IpAddr::V4(packet.get_real_dest()),
+            IcmpPacket::V6(packet) => IpAddr::V6(packet.get_real_dest()),
         }
     }
 }
