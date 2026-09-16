@@ -11,6 +11,11 @@ This file starts at 0.9.1. For earlier releases see the
 
 ## [Unreleased]
 
+### Changed
+
+- Echo requests are built in place instead of being copied out of their own
+  buffer, halving the allocations per ping.
+
 ## [0.9.1] - 2026-09-16
 
 A bug-fix release. No public API was changed or removed.

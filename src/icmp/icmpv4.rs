@@ -21,25 +21,29 @@ pub fn make_icmpv4_echo_packet(
 ) -> Result<Vec<u8>> {
     // 8 bytes of header, then payload.
     let mut buf = vec![0; 8 + payload.len()];
-    let mut packet = icmp::echo_request::MutableEchoRequestPacket::new(&mut buf[..])
-        .ok_or(SurgeError::IncorrectBufferSize)?;
+    {
+        let mut packet = icmp::echo_request::MutableEchoRequestPacket::new(&mut buf[..])
+            .ok_or(SurgeError::IncorrectBufferSize)?;
 
-    packet.set_icmp_type(icmp::IcmpTypes::EchoRequest);
-    packet.set_payload(payload);
-    packet.set_sequence_number(seq_cnt.into_u16());
+        packet.set_icmp_type(icmp::IcmpTypes::EchoRequest);
+        packet.set_payload(payload);
+        packet.set_sequence_number(seq_cnt.into_u16());
 
-    if !(is_linux_icmp_socket!(sock_type)) {
-        packet.set_identifier(ident_hint.into_u16());
+        if !(is_linux_icmp_socket!(sock_type)) {
+            packet.set_identifier(ident_hint.into_u16());
 
-        // Calculate and set the checksum
-        let icmp_packet =
-            icmp::IcmpPacket::new(packet.packet()).ok_or(SurgeError::IncorrectBufferSize)?;
+            // Calculate and set the checksum
+            let icmp_packet =
+                icmp::IcmpPacket::new(packet.packet()).ok_or(SurgeError::IncorrectBufferSize)?;
 
-        let checksum = icmp::checksum(&icmp_packet);
-        packet.set_checksum(checksum);
+            let checksum = icmp::checksum(&icmp_packet);
+            packet.set_checksum(checksum);
+        }
     }
 
-    Ok(packet.packet().to_vec())
+    // The packet was written into `buf` in place, so hand that back rather than
+    // copying the whole datagram out of it a second time.
+    Ok(buf)
 }
 
 /// Read the request quoted inside an ICMP error message.
@@ -310,6 +314,88 @@ impl Icmpv4Packet {
 mod tests {
     use super::*;
     use crate::Icmpv4Packet;
+
+    /// The builder writes into its buffer and returns it directly. This pins
+    /// the result byte for byte, and checks it against the copy the previous
+    /// implementation made via `packet().to_vec()` — the two must agree, which
+    /// is what makes dropping that copy safe.
+    #[test]
+    fn echo_request_is_built_in_place() {
+        let payload: Vec<u8> = (0u8..40).collect();
+        let buf = make_icmpv4_echo_packet(
+            PingIdentifier(0xbeef),
+            PingSequence(7),
+            SockType::RAW,
+            &payload,
+        )
+        .unwrap();
+
+        assert_eq!(buf.len(), 8 + payload.len(), "no bytes lost or added");
+        assert_eq!(buf[0], 8, "echo request type");
+        assert_eq!(buf[1], 0, "code");
+        assert_eq!(&buf[4..6], &0xbeefu16.to_be_bytes(), "identifier");
+        assert_eq!(&buf[6..8], &7u16.to_be_bytes(), "sequence");
+        assert_eq!(&buf[8..], &payload[..], "payload verbatim");
+
+        // What `packet().to_vec()` used to produce.
+        let mut copied = vec![0u8; 8 + payload.len()];
+        {
+            let mut p = icmp::echo_request::MutableEchoRequestPacket::new(&mut copied[..]).unwrap();
+            p.set_icmp_type(icmp::IcmpTypes::EchoRequest);
+            p.set_payload(&payload);
+            p.set_sequence_number(7);
+            p.set_identifier(0xbeef);
+            let checksum = icmp::checksum(&icmp::IcmpPacket::new(p.packet()).unwrap());
+            p.set_checksum(checksum);
+            assert_eq!(
+                p.packet().len(),
+                8 + payload.len(),
+                "packet() must span the whole buffer, or returning it would truncate"
+            );
+        }
+        assert_eq!(buf, copied, "identical to the previous implementation");
+
+        // The checksum covers the final bytes.
+        let mut zeroed = buf.clone();
+        zeroed[2] = 0;
+        zeroed[3] = 0;
+        assert_eq!(
+            u16::from_be_bytes([buf[2], buf[3]]),
+            icmp::checksum(&icmp::IcmpPacket::new(&zeroed).unwrap()),
+            "checksum is valid over the returned buffer"
+        );
+    }
+
+    #[test]
+    fn echo_request_accepts_an_empty_payload() {
+        let buf = make_icmpv4_echo_packet(PingIdentifier(1), PingSequence(2), SockType::RAW, &[])
+            .unwrap();
+        assert_eq!(buf.len(), 8);
+        assert_eq!(&buf[6..8], &2u16.to_be_bytes());
+    }
+
+    /// On a Linux ICMP socket the kernel owns the identifier and the checksum,
+    /// so the builder must leave both at zero.
+    #[test]
+    fn echo_request_leaves_kernel_owned_fields_alone() {
+        let buf = make_icmpv4_echo_packet(
+            PingIdentifier(0xbeef),
+            PingSequence(7),
+            SockType::DGRAM,
+            &[1, 2, 3, 4],
+        )
+        .unwrap();
+        assert_eq!(buf.len(), 12);
+        assert_eq!(&buf[6..8], &7u16.to_be_bytes());
+        assert_eq!(&buf[8..], &[1, 2, 3, 4]);
+
+        if is_linux_icmp_socket!(SockType::DGRAM) {
+            assert_eq!(&buf[2..4], &[0, 0], "checksum left to the kernel");
+            assert_eq!(&buf[4..6], &[0, 0], "identifier left to the kernel");
+        } else {
+            assert_eq!(&buf[4..6], &0xbeefu16.to_be_bytes());
+        }
+    }
 
     // The two wire formats are decoded by separate functions, and which one
     // `decode` picks is platform dependent, so each fixture is handed to the

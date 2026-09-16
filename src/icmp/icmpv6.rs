@@ -10,24 +10,27 @@ use crate::error::{MalformedPacketError, Result, SurgeError};
 
 use super::{PingIdentifier, PingSequence};
 
-#[allow(dead_code)]
 pub fn make_icmpv6_echo_packet(
     ident: PingIdentifier,
     seq_cnt: PingSequence,
     payload: &[u8],
 ) -> Result<Vec<u8>> {
     let mut buf = vec![0; 8 + payload.len()]; // 8 bytes of header, then payload
-    let mut packet = icmpv6::echo_request::MutableEchoRequestPacket::new(&mut buf[..])
-        .ok_or(SurgeError::IncorrectBufferSize)?;
-    packet.set_icmpv6_type(icmpv6::Icmpv6Types::EchoRequest);
-    packet.set_identifier(ident.into_u16());
-    packet.set_sequence_number(seq_cnt.into_u16());
-    packet.set_payload(payload);
+    {
+        let mut packet = icmpv6::echo_request::MutableEchoRequestPacket::new(&mut buf[..])
+            .ok_or(SurgeError::IncorrectBufferSize)?;
+        packet.set_icmpv6_type(icmpv6::Icmpv6Types::EchoRequest);
+        packet.set_identifier(ident.into_u16());
+        packet.set_sequence_number(seq_cnt.into_u16());
+        packet.set_payload(payload);
 
-    // Per https://tools.ietf.org/html/rfc3542#section-3.1 the checksum is
-    // omitted, the kernel will insert it.
+        // Per https://tools.ietf.org/html/rfc3542#section-3.1 the checksum is
+        // omitted, the kernel will insert it.
+    }
 
-    Ok(packet.packet().to_vec())
+    // The packet was written into `buf` in place, so hand that back rather than
+    // copying the whole datagram out of it a second time.
+    Ok(buf)
 }
 
 const IPPROTO_ICMPV6: u8 = 58;
@@ -277,6 +280,50 @@ impl Icmpv6Packet {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// As for IPv4: the builder returns its own buffer, and the result must
+    /// match what `packet().to_vec()` used to copy out of it.
+    #[test]
+    fn echo_request_is_built_in_place() {
+        let payload: Vec<u8> = (0u8..32).collect();
+        let buf =
+            make_icmpv6_echo_packet(PingIdentifier(0x1234), PingSequence(9), &payload).unwrap();
+
+        assert_eq!(buf.len(), 8 + payload.len(), "no bytes lost or added");
+        assert_eq!(buf[0], 128, "echo request type");
+        assert_eq!(buf[1], 0, "code");
+        assert_eq!(
+            &buf[2..4],
+            &[0, 0],
+            "checksum is left to the kernel, per RFC 3542 section 3.1"
+        );
+        assert_eq!(&buf[4..6], &0x1234u16.to_be_bytes(), "identifier");
+        assert_eq!(&buf[6..8], &9u16.to_be_bytes(), "sequence");
+        assert_eq!(&buf[8..], &payload[..], "payload verbatim");
+
+        let mut copied = vec![0u8; 8 + payload.len()];
+        {
+            let mut p =
+                icmpv6::echo_request::MutableEchoRequestPacket::new(&mut copied[..]).unwrap();
+            p.set_icmpv6_type(icmpv6::Icmpv6Types::EchoRequest);
+            p.set_identifier(0x1234);
+            p.set_sequence_number(9);
+            p.set_payload(&payload);
+            assert_eq!(
+                p.packet().len(),
+                8 + payload.len(),
+                "packet() must span the whole buffer, or returning it would truncate"
+            );
+        }
+        assert_eq!(buf, copied, "identical to the previous implementation");
+    }
+
+    #[test]
+    fn echo_request_accepts_an_empty_payload() {
+        let buf = make_icmpv6_echo_packet(PingIdentifier(1), PingSequence(2), &[]).unwrap();
+        assert_eq!(buf.len(), 8);
+        assert_eq!(&buf[6..8], &2u16.to_be_bytes());
+    }
 
     /// An ICMPv6 Time Exceeded quoting an echo request addressed to `target`.
     /// `extensions` are extension headers carried by the quoted request, given
