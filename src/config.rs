@@ -259,10 +259,7 @@ mod tests {
     #[test]
     fn test_config_builder_multiple_calls() {
         // Test that builder methods can be called multiple times
-        let config = ConfigBuilder::default()
-            .ttl(64)
-            .ttl(128)
-            .build();
+        let config = ConfigBuilder::default().ttl(64).ttl(128).build();
         assert_eq!(config.ttl, Some(128)); // Last call wins
     }
 }

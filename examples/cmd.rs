@@ -1,7 +1,7 @@
 use std::time::Duration;
 
 use structopt::StructOpt;
-use surge_ping::{Client, Config, IcmpPacket, PingIdentifier, PingSequence, ICMP};
+use surge_ping::{Client, Config, ICMP, IcmpPacket, PingIdentifier, PingSequence};
 use tokio::time;
 
 #[derive(Default, Debug)]
@@ -33,29 +33,23 @@ impl Answer {
     }
 
     fn min(&self) -> Option<f64> {
-        let min = self
-            .durations
+        self.durations
             .iter()
             .min()
-            .map(|dur| dur.as_secs_f64() * 1000f64);
-        min
+            .map(|dur| dur.as_secs_f64() * 1000f64)
     }
 
     fn max(&self) -> Option<f64> {
-        let max = self
-            .durations
+        self.durations
             .iter()
             .max()
-            .map(|dur| dur.as_secs_f64() * 1000f64);
-        max
+            .map(|dur| dur.as_secs_f64() * 1000f64)
     }
 
     fn avg(&self) -> Option<f64> {
         let sum: Duration = self.durations.iter().sum();
-        let avg = sum
-            .checked_div(self.durations.iter().len() as u32)
-            .map(|dur| dur.as_secs_f64() * 1000f64);
-        avg
+        sum.checked_div(self.durations.iter().len() as u32)
+            .map(|dur| dur.as_secs_f64() * 1000f64)
     }
 
     fn mdev(&self) -> Option<f64> {

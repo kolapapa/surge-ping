@@ -1,8 +1,6 @@
-use surge_ping::{
-    Client, Config, ICMP, PingIdentifier, PingSequence, SurgeError,
-};
 use std::net::IpAddr;
 use std::time::Duration;
+use surge_ping::{Client, Config, ICMP, PingIdentifier, PingSequence, SurgeError};
 
 #[tokio::test]
 async fn test_client_creation() {
@@ -158,10 +156,7 @@ async fn test_ping_with_different_payload_sizes() {
 
     for size in sizes {
         let payload = vec![0u8; size];
-        match pinger
-            .ping(PingSequence(size as u16), &payload)
-            .await
-        {
+        match pinger.ping(PingSequence(size as u16), &payload).await {
             Ok(_) => {
                 // Success
             }

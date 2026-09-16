@@ -8,7 +8,7 @@ use tokio::time::timeout;
 use crate::{
     client::{AsyncSocket, ReplyMap},
     error::{Result, SurgeError},
-    icmp::{icmpv4, icmpv6, IcmpPacket, PingIdentifier, PingSequence},
+    icmp::{IcmpPacket, PingIdentifier, PingSequence, icmpv4, icmpv6},
     is_linux_icmp_socket,
 };
 

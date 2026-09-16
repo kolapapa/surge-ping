@@ -2,9 +2,9 @@ use socket2::Type as SockType;
 use std::convert::TryInto;
 use std::net::Ipv4Addr;
 
-use pnet_packet::icmp::{self, IcmpCode, IcmpType};
 use pnet_packet::Packet;
-use pnet_packet::{ipv4, PacketSize};
+use pnet_packet::icmp::{self, IcmpCode, IcmpType};
+use pnet_packet::{PacketSize, ipv4};
 
 use crate::{
     error::{MalformedPacketError, Result, SurgeError},
@@ -295,44 +295,52 @@ mod tests {
     fn malformed_packet() {
         let decoded_ipv4 =
             hex::decode("4500001d0000000079018a76acd90e6e0a00f22203006c3293cc").unwrap();
-        assert!(Icmpv4Packet::decode(
-            &decoded_ipv4,
-            SockType::RAW,
-            ("172.217.14.110").parse().unwrap(),
-            ("10.0.242.34").parse().unwrap(),
-        )
-        .is_err());
+        assert!(
+            Icmpv4Packet::decode(
+                &decoded_ipv4,
+                SockType::RAW,
+                ("172.217.14.110").parse().unwrap(),
+                ("10.0.242.34").parse().unwrap(),
+            )
+            .is_err()
+        );
 
         let decoded_icmp = hex::decode("03006c3293cc").unwrap();
-        assert!(Icmpv4Packet::decode(
-            &decoded_icmp,
-            SockType::DGRAM,
-            ("172.217.14.110").parse().unwrap(),
-            ("10.0.242.34").parse().unwrap(),
-        )
-        .is_err());
+        assert!(
+            Icmpv4Packet::decode(
+                &decoded_icmp,
+                SockType::DGRAM,
+                ("172.217.14.110").parse().unwrap(),
+                ("10.0.242.34").parse().unwrap(),
+            )
+            .is_err()
+        );
     }
 
     #[test]
     fn short_packet() {
         let decoded_ipv4 =
             hex::decode("4500001d0000000079018a76acd90e6e0a00f22203006c3293cc000100").unwrap();
-        assert!(Icmpv4Packet::decode(
-            &decoded_ipv4,
-            SockType::RAW,
-            ("172.217.14.110").parse().unwrap(),
-            ("10.0.242.34").parse().unwrap(),
-        )
-        .is_err());
+        assert!(
+            Icmpv4Packet::decode(
+                &decoded_ipv4,
+                SockType::RAW,
+                ("172.217.14.110").parse().unwrap(),
+                ("10.0.242.34").parse().unwrap(),
+            )
+            .is_err()
+        );
 
         let decoded_icmp = hex::decode("03006c3293cc000100").unwrap();
-        assert!(Icmpv4Packet::decode(
-            &decoded_icmp,
-            SockType::DGRAM,
-            ("172.217.14.110").parse().unwrap(),
-            ("10.0.242.34").parse().unwrap(),
-        )
-        .is_err());
+        assert!(
+            Icmpv4Packet::decode(
+                &decoded_icmp,
+                SockType::DGRAM,
+                ("172.217.14.110").parse().unwrap(),
+                ("10.0.242.34").parse().unwrap(),
+            )
+            .is_err()
+        );
     }
 
     #[test]

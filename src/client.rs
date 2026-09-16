@@ -7,8 +7,8 @@ use std::{
     collections::HashMap,
     io,
     net::{IpAddr, SocketAddr},
-    sync::atomic::{AtomicBool, Ordering},
     sync::Arc,
+    sync::atomic::{AtomicBool, Ordering},
     time::Instant,
 };
 
@@ -22,9 +22,9 @@ use tokio::{
 use tracing::debug;
 
 use crate::{
+    ICMP, IcmpPacket, PingIdentifier, PingSequence, Pinger, SurgeError,
     config::Config,
     icmp::{icmpv4::Icmpv4Packet, icmpv6::Icmpv6Packet},
-    IcmpPacket, PingIdentifier, PingSequence, Pinger, SurgeError, ICMP,
 };
 
 // Check, if the platform's socket operates with ICMP packets in a casual way
@@ -127,7 +127,15 @@ impl AsyncSocket {
         match Socket::new(domain, fallback_type, proto) {
             Ok(sock) => Ok((fallback_type, sock)),
             Err(_second_err) => {
-                #[cfg(all(target_os = "linux", any(target_arch = "x86", target_arch = "x86_64", target_arch = "arm", target_arch = "aarch64")))]
+                #[cfg(all(
+                    target_os = "linux",
+                    any(
+                        target_arch = "x86",
+                        target_arch = "x86_64",
+                        target_arch = "arm",
+                        target_arch = "aarch64"
+                    )
+                ))]
                 {
                     if config.sock_type_hint == SockType::DGRAM
                         && first_err.kind() == io::ErrorKind::PermissionDenied

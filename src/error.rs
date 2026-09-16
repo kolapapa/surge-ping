@@ -3,7 +3,7 @@ use std::{io, net::IpAddr};
 
 use thiserror::Error;
 
-use crate::{icmp::PingSequence, PingIdentifier};
+use crate::{PingIdentifier, icmp::PingSequence};
 
 pub type Result<T> = std::result::Result<T, SurgeError>;
 
@@ -71,7 +71,9 @@ mod tests {
 
     #[test]
     fn test_surge_error_timeout() {
-        let err = SurgeError::Timeout { seq: PingSequence(5) };
+        let err = SurgeError::Timeout {
+            seq: PingSequence(5),
+        };
         assert_eq!(err.to_string(), "Request timeout for icmp_seq 5");
     }
 
@@ -83,10 +85,7 @@ mod tests {
             ident: Some(PingIdentifier(42)),
             seq: PingSequence(10),
         };
-        assert_eq!(
-            err.to_string(),
-            "Multiple identical request"
-        );
+        assert_eq!(err.to_string(), "Multiple identical request");
     }
 
     #[test]

@@ -3,7 +3,7 @@ use std::time::Duration;
 
 use futures::future::join_all;
 use rand::random;
-use surge_ping::{Client, Config, IcmpPacket, PingIdentifier, PingSequence, ICMP};
+use surge_ping::{Client, Config, ICMP, IcmpPacket, PingIdentifier, PingSequence};
 use tokio::time;
 
 #[tokio::main]

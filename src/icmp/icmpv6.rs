@@ -1,9 +1,9 @@
 use std::convert::TryInto;
 use std::net::Ipv6Addr;
 
-use pnet_packet::icmpv6::{self, Icmpv6Code, Icmpv6Type};
 use pnet_packet::Packet;
 use pnet_packet::PacketSize;
+use pnet_packet::icmpv6::{self, Icmpv6Code, Icmpv6Type};
 
 use crate::error::{MalformedPacketError, Result, SurgeError};
 

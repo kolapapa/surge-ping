@@ -2,7 +2,7 @@ use std::net::SocketAddr;
 use std::time::Duration;
 
 use structopt::StructOpt;
-use surge_ping::{Client, Config, PingIdentifier, PingSequence, ICMP};
+use surge_ping::{Client, Config, ICMP, PingIdentifier, PingSequence};
 
 #[derive(StructOpt, Debug)]
 #[structopt(name = "surge-ping")]

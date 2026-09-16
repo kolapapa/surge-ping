@@ -10,21 +10,16 @@ pub use client::{AsyncSocket, Client};
 pub use config::{Config, ConfigBuilder};
 pub use error::SurgeError;
 pub use icmp::{
-    icmpv4::Icmpv4Packet, icmpv6::Icmpv6Packet, IcmpPacket, PingIdentifier, PingSequence,
+    IcmpPacket, PingIdentifier, PingSequence, icmpv4::Icmpv4Packet, icmpv6::Icmpv6Packet,
 };
 pub use ping::Pinger;
 use rand::random;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ICMP {
+    #[default]
     V4,
     V6,
-}
-
-impl Default for ICMP {
-    fn default() -> Self {
-        ICMP::V4
-    }
 }
 
 /// Shortcut method to ping address.
