@@ -398,6 +398,11 @@ impl Client {
     /// A client is generated according to the configuration. In fact, a `AsyncSocket` is wrapped inside,
     /// and you can clone to any `task` at will.
     pub fn new(config: &Config) -> io::Result<Self> {
+        if tokio::runtime::Handle::try_current().is_err() {
+            return Err(io::Error::other(
+                "surge_ping::Client::new requires a Tokio 1.x runtime",
+            ));
+        }
         let socket = AsyncSocket::new(config)?;
         let reply_map = ReplyMap::default();
         let recv = task::spawn(recv_task(socket.clone(), reply_map.clone()));
