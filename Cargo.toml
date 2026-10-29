@@ -13,7 +13,7 @@ categories = ["network-programming", "asynchronous"]
 
 [dependencies]
 hex = "0.4.3"
-parking_lot = "0.12.1"
+parking_lot = ">=0.12.1, <0.14.0"
 rand = "0.10.1"
 socket2 = { version = "0.6.1", features = ["all"] }
 pnet_packet = "0.35"
