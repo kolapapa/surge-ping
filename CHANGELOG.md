@@ -16,6 +16,12 @@ This file starts at 0.9.1. For earlier releases see the
 - Echo requests are built in place instead of being copied out of their own
   buffer, halving the allocations per ping.
 
+### Fixed
+
+- **Builds again on targets without 64-bit atomics**, such as 32-bit PowerPC and
+  MIPS. The registration counter added in 0.9.1 now lives behind the lock that
+  guards the waiter table.
+
 ## [0.9.1] - 2026-09-16
 
 A bug-fix release. No public API was changed or removed.
