@@ -68,6 +68,15 @@ jobs:
       - run: rustup toolchain install 1.85.0 --profile minimal
       - run: cargo +1.85.0 check --all-targets --all-features
 
+  # A target whose max-atomic-width is 32, so std has no AtomicU64 there.
+  no-atomic64:
+    name: check (powerpc-unknown-linux-gnu)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install stable --profile minimal --target powerpc-unknown-linux-gnu
+      - run: cargo +stable check --target powerpc-unknown-linux-gnu
+
   # Everything above is hermetic. This job is the only one that opens a real
   # ICMP socket, so it is kept separate: a runner without ping permissions
   # should not look like a code failure.

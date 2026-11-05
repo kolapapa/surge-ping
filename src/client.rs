@@ -8,7 +8,6 @@ use std::{
     io,
     net::{IpAddr, SocketAddr},
     sync::Arc,
-    sync::atomic::{AtomicU64, Ordering},
     time::Instant,
 };
 
@@ -206,13 +205,13 @@ struct Registration {
 /// be shut down in the window between "is it still alive?" and "register me".
 struct ReplyMapState {
     alive: bool,
+    next_id: u64,
     waiters: HashMap<ReplyToken, Registration>,
 }
 
 #[derive(Clone)]
 pub(crate) struct ReplyMap {
     state: Arc<Mutex<ReplyMapState>>,
-    next_id: Arc<AtomicU64>,
 }
 
 impl Default for ReplyMap {
@@ -220,9 +219,9 @@ impl Default for ReplyMap {
         Self {
             state: Arc::new(Mutex::new(ReplyMapState {
                 alive: true,
+                next_id: 0,
                 waiters: HashMap::new(),
             })),
-            next_id: Arc::new(AtomicU64::new(0)),
         }
     }
 }
@@ -238,16 +237,16 @@ impl ReplyMap {
         seq: PingSequence,
     ) -> Result<ReplyWaiter, SurgeError> {
         let token = ReplyToken(host, ident, seq);
-        let id = self.next_id.fetch_add(1, Ordering::Relaxed);
         let (tx, rx) = oneshot::channel();
 
-        {
+        let id = {
             let mut state = self.state.lock();
             // Checked under the same lock that shutdown takes, so a client that
             // goes away concurrently can never leave this registration stranded.
             if !state.alive {
                 return Err(SurgeError::ClientDestroyed);
             }
+            let id = state.next_id;
             match state.waiters.entry(token) {
                 // Somebody is already waiting for this exact reply. Do not
                 // disturb them: leave their sender in place, reject the newcomer.
@@ -256,7 +255,9 @@ impl ReplyMap {
                 }
                 Entry::Vacant(vacant) => vacant.insert(Registration { id, tx }),
             };
-        }
+            state.next_id += 1;
+            id
+        };
 
         Ok(ReplyWaiter {
             map: self.clone(),
